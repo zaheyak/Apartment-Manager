@@ -12,10 +12,10 @@ import {
 } from '../lib/labels.js';
 
 const fontsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
-const ACCENT = '#2563eb';
-const ACCENT_DARK = '#1e3a8a';
-const ACCENT_LIGHT = '#eff6ff';
-const BORDER = '#93c5fd';
+const ACCENT = '#17365d';
+const ACCENT_DARK = '#0b1f3a';
+const ACCENT_LIGHT = '#eef3f8';
+const BORDER = '#9aaabd';
 
 function visual(value) {
   // PDFKit splits on ordinary spaces before shaping Hebrew. Keeping the phrase
@@ -35,10 +35,10 @@ function drawPair(doc, y, label, value, emphasis = false) {
   if (emphasis) doc.rect(48, y, 499, rowHeight).fill(ACCENT_LIGHT);
   doc.rect(48, y, 499, rowHeight).lineWidth(0.7).strokeColor(BORDER).stroke();
   doc.moveTo(300, y).lineTo(300, y + rowHeight).strokeColor(BORDER).stroke();
-  doc.font('bold').fontSize(11).fillColor('#111827');
-  doc.text(visual(label), 310, y + 8, { width: 227, align: 'right', lineBreak: false });
-  doc.font('bold').fontSize(11).fillColor(emphasis ? ACCENT_DARK : '#111827');
-  doc.text(visual(value), 58, y + 8, { width: 232, align: 'left', lineBreak: false });
+  doc.font('bold').fontSize(12).fillColor('#111827');
+  doc.text(visual(label), 310, y + 7, { width: 227, align: 'right', lineBreak: false });
+  doc.font('bold').fontSize(12).fillColor(emphasis ? ACCENT_DARK : '#111827');
+  doc.text(visual(value), 58, y + 7, { width: 232, align: 'left', lineBreak: false });
   return y + rowHeight;
 }
 
@@ -61,11 +61,11 @@ function drawProfessionalHeader(doc, title, subtitle) {
   doc.rect(48, 30, contentWidth, 5).fill(ACCENT);
   doc.font('bold').fontSize(23).fillColor(ACCENT_DARK);
   doc.text(visual(title), 230, 50, { width: doc.page.width - 278, align: 'right' });
-  doc.font('bold').fontSize(11).fillColor('#1f2937');
+  doc.font('bold').fontSize(12).fillColor('#1f2937');
   doc.text(visual(subtitle), 230, 82, { width: doc.page.width - 278, align: 'right' });
-  doc.font('bold').fontSize(11).fillColor(ACCENT_DARK);
+  doc.font('bold').fontSize(12).fillColor(ACCENT_DARK);
   doc.text(visual('מערכת ניהול דירות'), 48, 55, { width: 160, align: 'left' });
-  doc.font('bold').fontSize(9.5).fillColor('#1f2937');
+  doc.font('bold').fontSize(10.5).fillColor('#1f2937');
   doc.text(visual(formatDate(new Date().toISOString())), 48, 78, { width: 160, align: 'left' });
   doc.moveTo(48, 108).lineTo(doc.page.width - 48, 108).lineWidth(0.8).strokeColor(BORDER).stroke();
 }
@@ -74,18 +74,18 @@ function drawClientBox(doc, y, { name, phone, apartment, period, documentNumber 
   const contentWidth = doc.page.width - 96;
   const rightX = doc.page.width - 295;
   doc.roundedRect(48, y, contentWidth, 76, 7).fillAndStroke(ACCENT_LIGHT, BORDER);
-  doc.font('bold').fontSize(10).fillColor(ACCENT_DARK);
+  doc.font('bold').fontSize(11).fillColor(ACCENT_DARK);
   doc.text(visual('לכבוד'), rightX, y + 12, { width: 227, align: 'right' });
   doc.font('bold').fontSize(14).fillColor(ACCENT_DARK);
   doc.text(visual(name || 'לא משויך דייר'), rightX, y + 30, { width: 227, align: 'right' });
-  doc.font('bold').fontSize(10).fillColor('#1f2937');
+  doc.font('bold').fontSize(11).fillColor('#1f2937');
   if (phone) doc.text(visual(phone), rightX, y + 53, { width: 227, align: 'right' });
   const details = [
     apartment ? ['דירה', apartment] : null,
     period ? ['תקופה', period] : null,
     documentNumber ? ['מסמך', documentNumber] : null,
   ].filter(Boolean);
-  doc.font('bold').fontSize(10).fillColor('#1f2937');
+  doc.font('bold').fontSize(11).fillColor('#1f2937');
   details.forEach(([label, value], index) => {
     const lineY = y + 13 + (index * 19);
     doc.font('bold').text(visual(label), 185, lineY, { width: 91, align: 'right' });
@@ -95,15 +95,15 @@ function drawClientBox(doc, y, { name, phone, apartment, period, documentNumber 
 }
 
 function drawTableHeader(doc, y, columns) {
-  const height = 30;
+  const height = 34;
   const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
   doc.rect(48, y, tableWidth, height).fillAndStroke(ACCENT, ACCENT_DARK);
   let x = 48;
   for (const column of columns) {
-    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#dbeafe').stroke();
-    doc.font('bold').fontSize(10).fillColor('#ffffff');
-    doc.text(visual(column.label), x + 7, y + 9, {
-      width: column.width - 14,
+    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#dbe4ee').stroke();
+    doc.font('bold').fontSize(11.5).fillColor('#ffffff');
+    doc.text(visual(column.label), x + 5, y + 9, {
+      width: column.width - 10,
       align: column.align || 'right',
       lineBreak: false,
     });
@@ -119,9 +119,9 @@ function drawTableRow(doc, y, columns, values, { height = 38, bold = false, fill
   let x = 48;
   columns.forEach((column, index) => {
     if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor(BORDER).stroke();
-    doc.font('bold').fontSize(10.3).fillColor('#1f2937');
-    doc.text(visual(values[index] ?? '—'), x + 7, y + 10, {
-      width: column.width - 14,
+    doc.font('bold').fontSize(11.5).fillColor('#111827');
+    doc.text(visual(values[index] ?? '—'), x + 5, y + 10, {
+      width: column.width - 10,
       align: column.align || 'right',
       lineBreak: false,
     });
@@ -132,7 +132,7 @@ function drawTableRow(doc, y, columns, values, { height = 38, bold = false, fill
 
 function drawTotalBox(doc, y, label, value) {
   doc.roundedRect(287, y, 260, 62, 6).fillAndStroke(ACCENT_LIGHT, ACCENT);
-  doc.font('bold').fontSize(11).fillColor(ACCENT_DARK);
+  doc.font('bold').fontSize(12).fillColor(ACCENT_DARK);
   doc.text(visual(label), 307, y + 12, { width: 220, align: 'right' });
   doc.font('bold').fontSize(22).fillColor(ACCENT_DARK);
   doc.text(visual(value), 307, y + 31, { width: 220, align: 'right' });
