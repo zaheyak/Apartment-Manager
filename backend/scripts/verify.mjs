@@ -128,6 +128,10 @@ assert(partial.snapshot.remainingAfter === '1807.55', `remaining ${partial.snaps
 assert(partial.snapshot.status === 'partial', 'partial status');
 assert(partial.snapshot.lines[0].paidNow === '2000.00', 'allocated to rent first');
 assert(partial.snapshot.disclaimer.includes('אינו חשבונית מס'), 'disclaimer');
+assert(partial.snapshot.statement.totalDue === '3807.55', 'receipt monthly statement total');
+assert(partial.snapshot.statement.electricity.previousReading === '1000.000', 'receipt electricity reading');
+assert(partial.snapshot.statement.water.currentReading === '120.740', 'receipt water reading');
+assert(partial.snapshot.statement.cumulativeRemaining === '1807.55', 'receipt accumulated balance');
 
 const rest = await request(`/apartments/${apartment.id}/payments`, {
   method: 'POST',
@@ -225,6 +229,7 @@ const cumulativePayment = await request(`/apartments/${apartment.id}/payments`, 
 });
 assert(cumulativePayment.snapshot.applyToOldest === true, 'cumulative payment receipt');
 assert(cumulativePayment.snapshot.remainingAfter === '3565.00', 'cumulative remaining after payment');
+assert(cumulativePayment.snapshot.statement.cumulativeRemaining === '3565.00', 'statement cumulative balance');
 const afterCumulativePayment = await request(
   `/apartments/${apartment.id}/months?year=${testYear}`,
   auth,

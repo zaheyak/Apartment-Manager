@@ -2,6 +2,7 @@ import { AppError } from '../lib/errors.js';
 import { chargeStatus, fromCents, money, toCents } from '../lib/money.js';
 import { pool } from '../db/pool.js';
 import { getApartment } from './apartmentService.js';
+import { groupCharges, loadCharges } from './chargeQueries.js';
 
 const CATEGORY_ORDER = ['rent', 'electricity', 'water'];
 
@@ -193,6 +194,10 @@ export async function recordPayment(apartmentId, input, adminId) {
     const paidBefore = lines.reduce((sum, line) => sum + toCents(line.paidBefore), 0);
     const paidNow = toCents(input.amount);
     const remainingAfter = totalDue - paidBefore - paidNow;
+    const statementMonths = groupCharges(await loadCharges(client, apartmentId));
+    const statement = statementMonths.find(
+      (month) => month.year === input.billingYear && month.month === input.billingMonth,
+    );
 
     const sequence = await client.query(`SELECT nextval('receipt_seq') AS n`);
     const receiptNumber = `RC-${input.paymentDate.slice(0, 4)}-${String(sequence.rows[0].n).padStart(4, '0')}`;
@@ -214,6 +219,7 @@ export async function recordPayment(apartmentId, input, adminId) {
       status: chargeStatus(totalDue / 100, (paidBefore + paidNow) / 100),
       referenceNumber: input.referenceNumber || '',
       notes: input.notes || '',
+      statement: statement || null,
       disclaimer: 'מסמך זה הוא אישור תשלום פנימי ואינו חשבונית מס או קבלה כדין.',
     };
 

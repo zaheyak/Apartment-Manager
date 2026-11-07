@@ -215,8 +215,8 @@ router.get('/apartments/:id/months/:year/:month/summary.pdf', asyncRoute(async (
   const record = report.months.find((item) => item.year === year && item.month === month);
   if (!record) throw new AppError(404, 'החודש לא נמצא');
   const buffer = await renderSummaryPdf({
-    title: 'סיכום חודשי',
-    subtitle: `דירה ${report.apartment.number} · ${monthLabel(year, month)}`,
+    title: 'דוח חיובים ותשלומים חודשי',
+    subtitle: 'פירוט מלא של החשבון החודשי',
     rows: monthSummaryRows(report.apartment, record),
   });
   sendPdf(res, buffer, `summary-${report.apartment.number}-${year}-${month}.pdf`);
