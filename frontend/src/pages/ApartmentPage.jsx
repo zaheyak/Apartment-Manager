@@ -410,7 +410,7 @@ export default function ApartmentPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.xlsx`, `apartment-${apartment.number}.xlsx`)}>ייצוא Excel</Button>
-          <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.pdf`, `apartment-${apartment.number}.pdf`)}>ייצוא PDF</Button>
+          <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.pdf`, `full-history-${apartment.number}.pdf`)}>PDF כל החודשים והתשלומים</Button>
           <Button onClick={() => setModal({ type: 'month' })}>{months.length === 0 ? 'הזנת קריאות ראשוניות' : 'חודש חדש'}</Button>
         </div>
       </div>
@@ -533,7 +533,7 @@ export default function ApartmentPage() {
                 <div key={`${month.year}-${month.month}`} className="rounded-2xl border border-slate-200 p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div><h3 className="font-semibold">{monthLabel(month.year, month.month)}</h3><p className="text-sm text-slate-500">יתרת פתיחה {formatMoney(month.openingBalance)} · חיוב החודש {formatMoney(month.totalDue)} · שולם {formatMoney(month.totalPaid)} · יתרה מצטברת {formatMoney(month.cumulativeRemaining)}</p></div>
-                    <div className="flex gap-2"><Badge status={month.status} /><Button variant="ghost" onClick={() => setModal({ type: 'editMonth', record: month })}>עריכה</Button><Button variant="ghost" onClick={() => downloadFile(`/api/apartments/${id}/months/${month.year}/${month.month}/summary.pdf`, `summary-${month.year}-${month.month}.pdf`)}>PDF מפורט</Button></div>
+                    <div className="flex flex-wrap gap-2"><Badge status={month.status} /><Button variant="ghost" onClick={() => setModal({ type: 'editMonth', record: month })}>עריכה</Button><Button variant="ghost" onClick={() => downloadFile(`/api/apartments/${id}/months/${month.year}/${month.month}/summary.pdf`, `monthly-charge-${month.year}-${month.month}.pdf`)}>PDF סיכום חיוב החודש</Button></div>
                   </div>
                   <div className="grid gap-3 lg:grid-cols-3">
                     <ChargeBlock title="שכר דירה" charge={month.rent} />
@@ -553,7 +553,7 @@ export default function ApartmentPage() {
           <div className="overflow-auto">
             <table className="w-full min-w-[700px] text-right text-sm">
               <thead className="border-b text-slate-500"><tr><th className="p-3">תאריך</th><th className="p-3">חודש</th><th className="p-3">סכום</th><th className="p-3">אמצעי</th><th className="p-3">קטגוריה</th><th className="p-3">אסמכתא</th><th className="p-3">מסמך</th></tr></thead>
-              <tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-slate-100"><td className="p-3">{formatDate(payment.paymentDate)}</td><td className="p-3">{payment.applyToOldest ? `חוב מצטבר עד ${monthLabel(payment.billingYear, payment.billingMonth)}` : monthLabel(payment.billingYear, payment.billingMonth)}</td><td className="p-3 font-medium">{formatMoney(payment.amount)}</td><td className="p-3">{METHOD_LABELS[payment.method]}</td><td className="p-3">{CATEGORY_LABELS[payment.category]}</td><td className="p-3">{payment.referenceNumber || '—'}</td><td className="p-3">{payment.receiptId && <Button variant="ghost" onClick={() => downloadFile(`/api/receipts/${payment.receiptId}/pdf`, `${payment.receiptNumber}.pdf`)}>הורדה</Button>}</td></tr>)}</tbody>
+              <tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-slate-100"><td className="p-3">{formatDate(payment.paymentDate)}</td><td className="p-3">{payment.applyToOldest ? `חוב מצטבר עד ${monthLabel(payment.billingYear, payment.billingMonth)}` : monthLabel(payment.billingYear, payment.billingMonth)}</td><td className="p-3 font-medium">{formatMoney(payment.amount)}</td><td className="p-3">{METHOD_LABELS[payment.method]}</td><td className="p-3">{CATEGORY_LABELS[payment.category]}</td><td className="p-3">{payment.referenceNumber || '—'}</td><td className="p-3">{payment.receiptId && <Button variant="ghost" onClick={() => downloadFile(`/api/receipts/${payment.receiptId}/pdf`, `${payment.receiptNumber}.pdf`)}>אישור תשלום PDF</Button>}</td></tr>)}</tbody>
             </table>
           </div>
           {payments.length === 0 && <p className="mt-4 text-sm text-slate-500">עדיין לא נרשמו תשלומים.</p>}
@@ -563,7 +563,7 @@ export default function ApartmentPage() {
       {tab === 'documents' && (
         <Card title="אישורי תשלום">
           <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">המסמכים הם אישורי תשלום פנימיים ואינם חשבוניות מס או קבלות כדין.</p>
-          <div className="space-y-2">{receipts.map((receipt) => <div key={receipt.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"><div><div className="font-medium">{receipt.receiptNumber}</div><div className="text-sm text-slate-500">{formatDate(receipt.snapshot.paymentDate)} · {formatMoney(receipt.snapshot.paidNow)} · {monthLabel(receipt.snapshot.billingYear, receipt.snapshot.billingMonth)}</div></div><Button variant="secondary" onClick={() => downloadFile(`/api/receipts/${receipt.id}/pdf`, `${receipt.receiptNumber}.pdf`)}>הורדה / הדפסה</Button></div>)}</div>
+          <div className="space-y-2">{receipts.map((receipt) => <div key={receipt.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"><div><div className="font-medium">{receipt.receiptNumber}</div><div className="text-sm text-slate-500">{formatDate(receipt.snapshot.paymentDate)} · {formatMoney(receipt.snapshot.paidNow)} · {monthLabel(receipt.snapshot.billingYear, receipt.snapshot.billingMonth)}</div></div><Button variant="secondary" onClick={() => downloadFile(`/api/receipts/${receipt.id}/pdf`, `${receipt.receiptNumber}.pdf`)}>אישור תשלום PDF</Button></div>)}</div>
           {receipts.length === 0 && <p className="text-sm text-slate-500">אין מסמכים שמורים.</p>}
         </Card>
       )}

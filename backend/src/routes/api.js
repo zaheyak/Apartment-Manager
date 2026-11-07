@@ -31,8 +31,12 @@ import { createMonth, getMonths, readingPreview, updateMonth } from '../services
 import { getReceipt, listPayments, listReceipts, recordPayment } from '../services/paymentService.js';
 import { apartmentReport, buildingReport, dashboard } from '../services/reportService.js';
 import { addTariff, getSettings, updateBuilding } from '../services/settingsService.js';
-import { monthSummaryRows, renderReceiptPdf, renderSummaryPdf } from '../services/pdfService.js';
-import { monthLabel } from '../lib/labels.js';
+import {
+  apartmentHistoryRows,
+  monthChargeRows,
+  renderReceiptPdf,
+  renderSummaryPdf,
+} from '../services/pdfService.js';
 import {
   addPaymentRows,
   apartmentHistoryWorkbook,
@@ -215,11 +219,11 @@ router.get('/apartments/:id/months/:year/:month/summary.pdf', asyncRoute(async (
   const record = report.months.find((item) => item.year === year && item.month === month);
   if (!record) throw new AppError(404, 'החודש לא נמצא');
   const buffer = await renderSummaryPdf({
-    title: 'דוח חיובים ותשלומים חודשי',
-    subtitle: 'פירוט מלא של החשבון החודשי',
-    rows: monthSummaryRows(report.apartment, record),
+    title: 'סיכום חיוב חודשי',
+    subtitle: 'שכר דירה וקריאות חשמל ומים לחודש זה בלבד',
+    rows: monthChargeRows(report.apartment, record),
   });
-  sendPdf(res, buffer, `summary-${report.apartment.number}-${year}-${month}.pdf`);
+  sendPdf(res, buffer, `monthly-charge-${report.apartment.number}-${year}-${month}.pdf`);
 }));
 
 router.get('/reports/building', asyncRoute(async (_req, res) => {
@@ -268,23 +272,12 @@ router.get('/apartments/:id/history.xlsx', asyncRoute(async (req, res) => {
 
 router.get('/apartments/:id/history.pdf', asyncRoute(async (req, res) => {
   const report = await apartmentReport(req.params.id);
-  const rows = [
-    { label: 'דירה', value: report.apartment.number },
-    { label: 'דייר', value: report.apartment.tenantName || 'לא משויך דייר' },
-    { label: 'יתרה כוללת', value: `${report.apartment.outstanding} ₪` },
-    { kind: 'heading', text: 'סיכום שנתי' },
-    ...report.annual.flatMap((year) => ([
-      { label: `${year.year} — חיוב`, value: `${year.totalDue} ₪` },
-      { label: `${year.year} — שולם`, value: `${year.totalPaid} ₪` },
-      { label: `${year.year} — יתרה`, value: `${year.remaining} ₪` },
-    ])),
-  ];
   const buffer = await renderSummaryPdf({
-    title: 'היסטוריה כספית',
-    subtitle: `דירה ${report.apartment.number}`,
-    rows,
+    title: 'דוח מלא לכל החודשים והתשלומים',
+    subtitle: 'פירוט החיובים, התשלומים והיתרה הסופית',
+    rows: apartmentHistoryRows(report),
   });
-  sendPdf(res, buffer, `apartment-${report.apartment.number}.pdf`);
+  sendPdf(res, buffer, `full-history-${report.apartment.number}.pdf`);
 }));
 
 export default router;

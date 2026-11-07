@@ -140,7 +140,7 @@ export async function recordPayment(apartmentId, input, adminId) {
     if (!allocations.length) throw new AppError(400, 'אין יתרה פתוחה לתשלום');
 
     const lease = await client.query(
-      `SELECT t.full_name
+      `SELECT t.full_name, t.phone
        FROM leases l
        JOIN tenants t ON t.id = l.tenant_id
        WHERE l.apartment_id = $1 AND l.status = 'active'`,
@@ -198,6 +198,7 @@ export async function recordPayment(apartmentId, input, adminId) {
     const statement = statementMonths.find(
       (month) => month.year === input.billingYear && month.month === input.billingMonth,
     );
+    const accountRemainingAfter = statementMonths.at(-1)?.cumulativeRemaining || '0.00';
 
     const sequence = await client.query(`SELECT nextval('receipt_seq') AS n`);
     const receiptNumber = `RC-${input.paymentDate.slice(0, 4)}-${String(sequence.rows[0].n).padStart(4, '0')}`;
@@ -205,6 +206,7 @@ export async function recordPayment(apartmentId, input, adminId) {
       receiptNumber,
       apartmentNumber: apartment.rows[0].number,
       tenantName: lease.rows[0]?.full_name || '',
+      tenantPhone: lease.rows[0]?.phone || '',
       paymentDate: input.paymentDate,
       method: input.method,
       category: input.category,
@@ -220,6 +222,7 @@ export async function recordPayment(apartmentId, input, adminId) {
       referenceNumber: input.referenceNumber || '',
       notes: input.notes || '',
       statement: statement || null,
+      accountRemainingAfter,
       disclaimer: 'מסמך זה הוא אישור תשלום פנימי ואינו חשבונית מס או קבלה כדין.',
     };
 

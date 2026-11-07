@@ -6,7 +6,6 @@ import {
   CATEGORY_LABELS,
   METHOD_LABELS,
   MONTHS_HE,
-  STATUS_LABELS,
   formatDate,
   formatMoney,
   formatQty,
@@ -46,81 +45,11 @@ export function renderReceiptPdf(snapshot) {
   if (!fs.existsSync(path.join(fontsDir, 'NotoSansHebrew-Regular.ttf'))) {
     throw new Error('Hebrew font is missing');
   }
-  if (snapshot.statement) {
-    return renderSummaryPdf({
-      title: 'אישור תשלום וסיכום חשבון',
-      subtitle: 'מסמך מפורט של החיובים והתשלומים',
-      rows: receiptStatementRows(snapshot),
-    });
-  }
-  const doc = createDocument();
-  const chunks = [];
-  doc.on('data', (chunk) => chunks.push(chunk));
-  const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
-
-  doc.rect(0, 0, doc.page.width, 92).fill('#0f2744');
-  doc.fillColor('#ffffff').font('bold').fontSize(22);
-  doc.text(visual('אישור תשלום'), 48, 28, { width: 500, align: 'right' });
-  doc.font('regular').fontSize(11);
-  doc.text(visual('מסמך פנימי לניהול הבניין'), 48, 58, { width: 500, align: 'right' });
-
-  let y = 116;
-  y = drawPair(doc, y, 'מספר מסמך', snapshot.receiptNumber);
-  y = drawPair(doc, y, 'דירה', snapshot.apartmentNumber);
-  y = drawPair(doc, y, 'דייר', snapshot.tenantName || 'לא משויך דייר');
-  y = drawPair(doc, y, 'חודש חיוב', pdfMonthLabel(snapshot.billingYear, snapshot.billingMonth));
-  y = drawPair(doc, y, 'תאריך תשלום', formatDate(snapshot.paymentDate));
-  y = drawPair(doc, y, 'אמצעי תשלום', METHOD_LABELS[snapshot.method]);
-  y = drawPair(doc, y, 'קטגוריה', CATEGORY_LABELS[snapshot.category]);
-  if (snapshot.referenceNumber) y = drawPair(doc, y, 'אסמכתא', snapshot.referenceNumber);
-
-  y += 8;
-  doc.moveTo(48, y).lineTo(547, y).strokeColor('#cbd5e1').stroke();
-  y += 16;
-  doc.font('bold').fontSize(13).fillColor('#0f2744');
-  doc.text(visual('פירוט החיובים'), 48, y, { width: 499, align: 'right' });
-  y += 28;
-
-  for (const line of snapshot.lines) {
-    if (y > 640) {
-      doc.addPage();
-      y = 56;
-    }
-    doc.font('bold').fontSize(12).fillColor('#0f172a');
-    const lineTitle = `${pdfMonthLabel(
-      line.billingYear ?? snapshot.billingYear,
-      line.billingMonth ?? snapshot.billingMonth,
-    )} · ${CATEGORY_LABELS[line.category]}`;
-    doc.text(visual(lineTitle), 48, y, { width: 499, align: 'right' });
-    y += 18;
-    y = drawPair(doc, y, 'סכום מקורי', formatMoney(line.amountDue));
-    y = drawPair(doc, y, 'שולם קודם', formatMoney(line.paidBefore));
-    y = drawPair(doc, y, 'שולם בתנועה זו', formatMoney(line.paidNow));
-    y = drawPair(doc, y, 'יתרה אחרי התשלום', formatMoney(line.remainingAfter));
-    y += 6;
-  }
-
-  if (y > 640) {
-    doc.addPage();
-    y = 56;
-  }
-  y += 4;
-  doc.roundedRect(48, y, 499, 92, 8).fill('#f8fafc');
-  y += 12;
-  y = drawPair(
-    doc,
-    y,
-    snapshot.applyToOldest ? 'סך החיובים המצטברים' : 'סך החיוב לחודש',
-    formatMoney(snapshot.totalDue),
-  );
-  y = drawPair(doc, y, 'סכום שהתקבל כעת', formatMoney(snapshot.paidNow));
-  y = drawPair(doc, y, 'יתרה כוללת', formatMoney(snapshot.remainingAfter));
-  y = drawPair(doc, y, 'סטטוס', STATUS_LABELS[snapshot.status]);
-
-  doc.font('regular').fontSize(9).fillColor('#64748b');
-  doc.text(visual(snapshot.disclaimer), 48, 760, { width: 499, align: 'right' });
-  doc.end();
-  return done;
+  return renderSummaryPdf({
+    title: 'אישור תשלום',
+    subtitle: 'פרטי התשלום והיתרה לאחר התשלום',
+    rows: paymentReceiptRows(snapshot),
+  });
 }
 
 export function renderSummaryPdf({ title, subtitle, rows }) {
@@ -155,118 +84,97 @@ export function renderSummaryPdf({ title, subtitle, rows }) {
   return done;
 }
 
-function paymentRows(charge) {
-  if (!charge?.paymentDetails?.length) {
-    return [{ label: 'אופן התשלום', value: 'לא נרשם תשלום' }];
-  }
-  return charge.paymentDetails.map((payment, index) => ({
-    label: charge.paymentDetails.length > 1 ? `תשלום ${index + 1}` : 'פרטי התשלום',
-    value: [
-      formatMoney(payment.amount),
-      METHOD_LABELS[payment.method] || payment.method,
-      formatDate(payment.paymentDate),
-      payment.referenceNumber ? `אסמכתא ${payment.referenceNumber}` : '',
-    ].filter(Boolean).join(' · '),
-  }));
-}
-
-function receiptStatementRows(snapshot) {
-  const month = snapshot.statement;
+function paymentReceiptRows(snapshot) {
+  const remainingAfter = snapshot.accountRemainingAfter
+    ?? snapshot.statement?.cumulativeRemaining
+    ?? snapshot.remainingAfter;
+  const balanceBefore = Number(remainingAfter || 0) + Number(snapshot.paidNow || 0);
   return [
-    { kind: 'heading', text: 'פרטי התשלום שנרשם' },
+    { label: 'לכבוד', value: snapshot.tenantName || 'לא משויך דייר' },
+    ...(snapshot.tenantPhone ? [{ label: 'טלפון', value: snapshot.tenantPhone }] : []),
     { label: 'מספר מסמך', value: snapshot.receiptNumber },
     { label: 'דירה', value: snapshot.apartmentNumber },
-    { label: 'דייר', value: snapshot.tenantName || 'לא משויך דייר' },
-    { label: 'חודש חיוב', value: pdfMonthLabel(snapshot.billingYear, snapshot.billingMonth) },
+    { label: 'עבור חודש', value: pdfMonthLabel(snapshot.billingYear, snapshot.billingMonth) },
+    { kind: 'heading', text: 'פרטי התשלום' },
     { label: 'תאריך התשלום', value: formatDate(snapshot.paymentDate) },
-    { label: 'סכום התשלום הנוכחי', value: formatMoney(snapshot.paidNow) },
+    { label: 'סכום ששולם', value: formatMoney(snapshot.paidNow) },
     { label: 'אמצעי התשלום', value: METHOD_LABELS[snapshot.method] || snapshot.method },
+    { label: 'עבור', value: CATEGORY_LABELS[snapshot.category] || snapshot.category },
     ...(snapshot.referenceNumber
       ? [{ label: 'אסמכתא', value: snapshot.referenceNumber }]
       : []),
-    { kind: 'heading', text: 'יתרה קודמת' },
-    {
-      label: 'יתרה שלא שולמה מחודשים קודמים',
-      value: formatMoney(month.openingBalance),
-    },
-    { kind: 'heading', text: 'שכר דירה' },
-    { label: 'חיוב שכר דירה', value: formatMoney(month.rent?.amountDue) },
-    { label: 'שולם עבור שכר דירה', value: formatMoney(month.rent?.amountPaid) },
-    { label: 'נותר עבור שכר דירה', value: formatMoney(month.rent?.remaining) },
-    { kind: 'heading', text: 'חשמל' },
-    { label: 'קריאת מונה קודמת', value: formatQty(month.electricity?.previousReading) },
-    { label: 'קריאת מונה נוכחית', value: formatQty(month.electricity?.currentReading) },
-    { label: 'צריכה', value: formatQty(month.electricity?.consumption, 'קוט"ש') },
-    {
-      label: 'מחיר להכפלה',
-      value: `${formatMoney(month.electricity?.tariffPrice)} לכל קוט"ש`,
-    },
-    { label: 'חיוב חשמל', value: formatMoney(month.electricity?.amountDue) },
-    { label: 'שולם עבור חשמל', value: formatMoney(month.electricity?.amountPaid) },
-    { label: 'נותר עבור חשמל', value: formatMoney(month.electricity?.remaining) },
-    { kind: 'heading', text: 'מים' },
-    { label: 'קריאת מונה קודמת', value: formatQty(month.water?.previousReading) },
-    { label: 'קריאת מונה נוכחית', value: formatQty(month.water?.currentReading) },
-    { label: 'צריכה', value: formatQty(month.water?.consumption, 'מ"ק') },
-    {
-      label: 'מחיר להכפלה',
-      value: `${formatMoney(month.water?.tariffPrice)} לכל מ"ק`,
-    },
-    { label: 'חיוב מים', value: formatMoney(month.water?.amountDue) },
-    { label: 'שולם עבור מים', value: formatMoney(month.water?.amountPaid) },
-    { label: 'נותר עבור מים', value: formatMoney(month.water?.remaining) },
-    { kind: 'heading', text: 'סיכום החשבון' },
-    { label: 'סך חיובי החודש', value: formatMoney(month.totalDue) },
-    { label: 'סך ששולם עבור החודש', value: formatMoney(month.totalPaid) },
-    { label: 'יתרת החודש', value: formatMoney(month.remaining) },
-    { label: 'סך כל החיובים עד חודש זה', value: formatMoney(month.cumulativeDue) },
-    { label: 'סך כל התשלומים עד חודש זה', value: formatMoney(month.cumulativePaid) },
-    { label: 'יתרה סופית מצטברת', value: formatMoney(month.cumulativeRemaining) },
-    { label: 'סטטוס החודש', value: STATUS_LABELS[month.status] },
+    ...(snapshot.notes ? [{ label: 'הערות', value: snapshot.notes }] : []),
+    { kind: 'heading', text: 'יתרה' },
+    { label: 'יתרה לפני התשלום', value: formatMoney(balanceBefore) },
+    { label: 'שולם בתשלום זה', value: formatMoney(snapshot.paidNow) },
+    { label: 'יתרה לאחר התשלום', value: formatMoney(remainingAfter) },
   ];
 }
 
-export function monthSummaryRows(apartment, month) {
+export function monthChargeRows(apartment, month) {
   return [
+    { label: 'לכבוד', value: apartment.tenantName || 'לא משויך דייר' },
+    ...(apartment.tenantPhone ? [{ label: 'טלפון', value: apartment.tenantPhone }] : []),
     { label: 'דירה', value: apartment.number },
-    { label: 'דייר', value: apartment.tenantName || 'לא משויך דייר' },
-    { label: 'חודש', value: pdfMonthLabel(month.year, month.month) },
-    { label: 'יתרת פתיחה מחודשים קודמים', value: formatMoney(month.openingBalance) },
+    { label: 'סיכום עבור חודש', value: pdfMonthLabel(month.year, month.month) },
     { kind: 'heading', text: 'שכר דירה' },
-    { label: 'סכום', value: formatMoney(month.rent?.amountDue) },
-    { label: 'שולם', value: formatMoney(month.rent?.amountPaid) },
-    { label: 'יתרה', value: formatMoney(month.rent?.remaining) },
-    { label: 'סטטוס', value: STATUS_LABELS[month.rent?.status || 'unpaid'] },
-    { label: 'שולם עד', value: formatDate(month.rent?.paidThroughDate) || '—' },
-    ...paymentRows(month.rent),
+    { label: 'חיוב שכר דירה לחודש', value: formatMoney(month.rent?.amountDue) },
     { kind: 'heading', text: 'חשמל' },
-    { label: 'קריאה קודמת', value: formatQty(month.electricity?.previousReading) },
-    { label: 'קריאה נוכחית', value: formatQty(month.electricity?.currentReading) },
-    { label: 'צריכה', value: formatQty(month.electricity?.consumption, 'קוט"ש') },
-    { label: 'תעריף', value: `${formatMoney(month.electricity?.tariffPrice)} / קוט"ש` },
-    { label: 'חיוב', value: formatMoney(month.electricity?.amountDue) },
-    { label: 'שולם', value: formatMoney(month.electricity?.amountPaid) },
-    { label: 'יתרה', value: formatMoney(month.electricity?.remaining) },
-    { label: 'סטטוס', value: STATUS_LABELS[month.electricity?.status || 'unpaid'] },
-    ...paymentRows(month.electricity),
+    { label: 'קריאת חשמל קודמת', value: formatQty(month.electricity?.previousReading) },
+    { label: 'קריאת חשמל נוכחית', value: formatQty(month.electricity?.currentReading) },
+    { label: 'צריכת חשמל', value: formatQty(month.electricity?.consumption, 'קוט"ש') },
+    { label: 'מחיר להכפלה', value: `${formatMoney(month.electricity?.tariffPrice)} לכל קוט"ש` },
+    { label: 'חיוב חשמל לחודש', value: formatMoney(month.electricity?.amountDue) },
     { kind: 'heading', text: 'מים' },
-    { label: 'קריאה קודמת', value: formatQty(month.water?.previousReading) },
-    { label: 'קריאה נוכחית', value: formatQty(month.water?.currentReading) },
-    { label: 'צריכה', value: formatQty(month.water?.consumption, 'מ"ק') },
-    { label: 'תעריף', value: `${formatMoney(month.water?.tariffPrice)} / מ"ק` },
-    { label: 'חיוב', value: formatMoney(month.water?.amountDue) },
-    { label: 'שולם', value: formatMoney(month.water?.amountPaid) },
-    { label: 'יתרה', value: formatMoney(month.water?.remaining) },
-    { label: 'סטטוס', value: STATUS_LABELS[month.water?.status || 'unpaid'] },
-    ...paymentRows(month.water),
-    { kind: 'heading', text: 'סיכום' },
-    { label: 'יתרה קודמת מחודשים קודמים', value: formatMoney(month.openingBalance) },
-    { label: 'סך חיובי החודש', value: formatMoney(month.totalDue) },
-    { label: 'סך לתשלום כולל יתרה קודמת', value: formatMoney(Number(month.openingBalance) + Number(month.totalDue)) },
-    { label: 'סך ששולם עבור החודש', value: formatMoney(month.totalPaid) },
+    { label: 'קריאת מים קודמת', value: formatQty(month.water?.previousReading) },
+    { label: 'קריאת מים נוכחית', value: formatQty(month.water?.currentReading) },
+    { label: 'צריכת מים', value: formatQty(month.water?.consumption, 'מ"ק') },
+    { label: 'מחיר להכפלה', value: `${formatMoney(month.water?.tariffPrice)} לכל מ"ק` },
+    { label: 'חיוב מים לחודש', value: formatMoney(month.water?.amountDue) },
+    { kind: 'heading', text: 'סיכום החיוב החודשי' },
+    { label: 'שכר דירה', value: formatMoney(month.rent?.amountDue) },
+    { label: 'חשמל', value: formatMoney(month.electricity?.amountDue) },
+    { label: 'מים', value: formatMoney(month.water?.amountDue) },
+    { label: 'סך כל החיוב לחודש זה', value: formatMoney(month.totalDue) },
+  ];
+}
+
+export function apartmentHistoryRows(report) {
+  const totalDue = report.months.reduce((sum, month) => sum + Number(month.totalDue), 0);
+  const totalPaid = report.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const finalRemaining = report.months.at(-1)?.cumulativeRemaining
+    ?? report.apartment.outstanding
+    ?? 0;
+  const monthRows = report.months.flatMap((month) => ([
+    { kind: 'heading', text: pdfMonthLabel(month.year, month.month) },
+    { label: 'חיוב שכר דירה', value: formatMoney(month.rent?.amountDue) },
+    { label: 'חיוב חשמל', value: formatMoney(month.electricity?.amountDue) },
+    { label: 'חיוב מים', value: formatMoney(month.water?.amountDue) },
+    { label: 'סך חיוב החודש', value: formatMoney(month.totalDue) },
+    { label: 'שולם עבור החודש', value: formatMoney(month.totalPaid) },
     { label: 'יתרת החודש', value: formatMoney(month.remaining) },
-    { label: 'סך כל התשלומים עד חודש זה', value: formatMoney(month.cumulativePaid) },
-    { label: 'יתרה סופית מצטברת', value: formatMoney(month.cumulativeRemaining) },
-    { label: 'סטטוס', value: STATUS_LABELS[month.status] },
+  ]));
+  const paymentRows = report.payments.flatMap((payment, index) => ([
+    { kind: 'heading', text: `תשלום ${index + 1}` },
+    { label: 'תאריך', value: formatDate(payment.paymentDate) },
+    { label: 'סכום', value: formatMoney(payment.amount) },
+    { label: 'אמצעי תשלום', value: METHOD_LABELS[payment.method] || payment.method },
+    { label: 'עבור חודש', value: pdfMonthLabel(payment.billingYear, payment.billingMonth) },
+    ...(payment.referenceNumber ? [{ label: 'אסמכתא', value: payment.referenceNumber }] : []),
+  ]));
+  return [
+    { label: 'לכבוד', value: report.apartment.tenantName || 'לא משויך דייר' },
+    ...(report.apartment.tenantPhone
+      ? [{ label: 'טלפון', value: report.apartment.tenantPhone }]
+      : []),
+    { label: 'דירה', value: report.apartment.number },
+    { kind: 'heading', text: 'פירוט חיובים לפי חודש' },
+    ...monthRows,
+    { kind: 'heading', text: 'כל התשלומים' },
+    ...(paymentRows.length ? paymentRows : [{ label: 'תשלומים', value: 'לא נרשמו תשלומים' }]),
+    { kind: 'heading', text: 'סיכום סופי' },
+    { label: 'סך כל החיובים', value: formatMoney(totalDue) },
+    { label: 'סך כל התשלומים', value: formatMoney(totalPaid) },
+    { label: 'הסכום שנשאר לתשלום', value: formatMoney(finalRemaining) },
   ];
 }

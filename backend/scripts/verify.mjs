@@ -132,6 +132,7 @@ assert(partial.snapshot.statement.totalDue === '3807.55', 'receipt monthly state
 assert(partial.snapshot.statement.electricity.previousReading === '1000.000', 'receipt electricity reading');
 assert(partial.snapshot.statement.water.currentReading === '120.740', 'receipt water reading');
 assert(partial.snapshot.statement.cumulativeRemaining === '1807.55', 'receipt accumulated balance');
+assert(partial.snapshot.accountRemainingAfter === '1807.55', 'payment receipt remaining balance');
 
 const rest = await request(`/apartments/${apartment.id}/payments`, {
   method: 'POST',
@@ -257,6 +258,13 @@ const cumulativePdf = await fetch(
 );
 const cumulativePdfBytes = Buffer.from(await cumulativePdf.arrayBuffer());
 assert(cumulativePdf.ok && cumulativePdfBytes.subarray(0, 4).toString() === '%PDF', 'cumulative payment pdf');
+
+const historyPdf = await fetch(
+  `${base}/apartments/${apartment.id}/history.pdf`,
+  { headers: { Authorization: `Bearer ${token}` } },
+);
+const historyPdfBytes = Buffer.from(await historyPdf.arrayBuffer());
+assert(historyPdf.ok && historyPdfBytes.subarray(0, 4).toString() === '%PDF', 'full history pdf');
 
 const xlsx = await fetch(`${base}/apartments/${apartment.id}/history.xlsx`, {
   headers: { Authorization: `Bearer ${token}` },
