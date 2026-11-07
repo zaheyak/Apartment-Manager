@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+.apartment-dark {
+  color: #e2e8f0;
+}
+
+.apartment-dark .bg-white {
+  background-color: #11182a;
+}
+
+.apartment-dark .bg-slate-50,
+.apartment-dark .bg-slate-100 {
+  background-color: #0b1020;
+}
+
+.apartment-dark .text-slate-500,
+.apartment-dark .text-slate-600,
+.apartment-dark .text-slate-700,
+.apartment-dark .text-slate-800 {
+  color: #94a3b8;
+}
+
+.apartment-dark .border-slate-100,
+.apartment-dark .border-slate-200 {
+  border-color: #26324a;
+}
+
+.apartment-dark input,
+.apartment-dark select,
+.apartment-dark textarea {
+  border-color: #334155;
+  background: #0b1020;
+  color: #e2e8f0;
+}
+
+.apartment-dark table tbody tr:hover {
+  background: #151f35;
+}
