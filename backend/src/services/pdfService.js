@@ -26,12 +26,16 @@ function pdfMonthLabel(year, month) {
   return `${year} ${MONTHS_HE[month - 1]}`;
 }
 
-function drawPair(doc, y, label, value) {
-  doc.font('regular').fontSize(11).fillColor('#475569');
-  doc.text(visual(label), 310, y, { width: 240, align: 'right' });
-  doc.font('bold').fontSize(11).fillColor('#0f172a');
-  doc.text(visual(value), 48, y, { width: 250, align: 'left' });
-  return y + 22;
+function drawPair(doc, y, label, value, emphasis = false) {
+  const rowHeight = 30;
+  if (emphasis) doc.rect(48, y, 499, rowHeight).fill('#e8e8e8');
+  doc.rect(48, y, 499, rowHeight).lineWidth(0.7).strokeColor('#111111').stroke();
+  doc.moveTo(300, y).lineTo(300, y + rowHeight).strokeColor('#111111').stroke();
+  doc.font('bold').fontSize(10.5).fillColor('#000000');
+  doc.text(visual(label), 310, y + 8, { width: 227, align: 'right', lineBreak: false });
+  doc.font(emphasis ? 'bold' : 'regular').fontSize(10.5).fillColor('#000000');
+  doc.text(visual(value), 58, y + 8, { width: 232, align: 'left', lineBreak: false });
+  return y + rowHeight;
 }
 
 function createDocument() {
@@ -57,29 +61,37 @@ export function renderSummaryPdf({ title, subtitle, rows }) {
   const chunks = [];
   doc.on('data', (chunk) => chunks.push(chunk));
   const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
-  doc.rect(0, 0, doc.page.width, 78).fill('#0f2744');
-  doc.fillColor('#ffffff').font('bold').fontSize(20);
-  doc.text(visual(title), 48, 24, { width: 500, align: 'right' });
-  doc.font('regular').fontSize(11);
-  doc.text(visual(subtitle), 48, 50, { width: 500, align: 'right' });
+  doc.fillColor('#000000').font('bold').fontSize(22);
+  doc.text(visual(title), 48, 42, { width: 499, align: 'right' });
+  doc.font('regular').fontSize(11).fillColor('#000000');
+  doc.text(visual(subtitle), 48, 73, { width: 499, align: 'right' });
+  doc.moveTo(48, 98).lineTo(547, 98).lineWidth(1.2).strokeColor('#000000').stroke();
 
-  let y = 100;
+  let y = 116;
   for (const row of rows) {
-    if (y > 740) {
+    const neededHeight = row.kind === 'heading' ? 38 : 30;
+    if (y + neededHeight > 752) {
       doc.addPage();
-      y = 56;
+      doc.fillColor('#000000').font('bold').fontSize(13);
+      doc.text(visual(title), 48, 38, { width: 499, align: 'right' });
+      doc.moveTo(48, 62).lineTo(547, 62).lineWidth(0.8).strokeColor('#000000').stroke();
+      y = 78;
     }
     if (row.kind === 'heading') {
       y += 8;
-      doc.font('bold').fontSize(13).fillColor('#0f2744');
-      doc.text(visual(row.text), 48, y, { width: 499, align: 'right' });
-      y += 24;
+      doc.rect(48, y, 499, 30).fillAndStroke('#f1f1f1', '#111111');
+      doc.font('bold').fontSize(12).fillColor('#000000');
+      doc.text(visual(row.text), 58, y + 8, { width: 479, align: 'right', lineBreak: false });
+      y += 30;
       continue;
     }
-    y = drawPair(doc, y, row.label, row.value);
+    y = drawPair(doc, y, row.label, row.value, row.emphasis);
   }
-  doc.font('regular').fontSize(9).fillColor('#64748b');
-  doc.text(visual('המסמך הוא סיכום ניהולי ואינו חשבונית מס.'), 48, 780, { width: 499, align: 'right' });
+  doc.font('regular').fontSize(9).fillColor('#000000');
+  doc.text(visual('המסמך הוא מסמך ניהולי ואינו חשבונית מס או קבלה כדין.'), 48, 790, {
+    width: 499,
+    align: 'right',
+  });
   doc.end();
   return done;
 }
@@ -107,7 +119,7 @@ function paymentReceiptRows(snapshot) {
     { kind: 'heading', text: 'יתרה' },
     { label: 'יתרה לפני התשלום', value: formatMoney(balanceBefore) },
     { label: 'שולם בתשלום זה', value: formatMoney(snapshot.paidNow) },
-    { label: 'יתרה לאחר התשלום', value: formatMoney(remainingAfter) },
+    { label: 'יתרה לאחר התשלום', value: formatMoney(remainingAfter), emphasis: true },
   ];
 }
 
@@ -135,7 +147,7 @@ export function monthChargeRows(apartment, month) {
     { label: 'שכר דירה', value: formatMoney(month.rent?.amountDue) },
     { label: 'חשמל', value: formatMoney(month.electricity?.amountDue) },
     { label: 'מים', value: formatMoney(month.water?.amountDue) },
-    { label: 'סך כל החיוב לחודש זה', value: formatMoney(month.totalDue) },
+    { label: 'סך כל החיוב לחודש זה', value: formatMoney(month.totalDue), emphasis: true },
   ];
 }
 
@@ -175,6 +187,6 @@ export function apartmentHistoryRows(report) {
     { kind: 'heading', text: 'סיכום סופי' },
     { label: 'סך כל החיובים', value: formatMoney(totalDue) },
     { label: 'סך כל התשלומים', value: formatMoney(totalPaid) },
-    { label: 'הסכום שנשאר לתשלום', value: formatMoney(finalRemaining) },
+    { label: 'הסכום שנשאר לתשלום', value: formatMoney(finalRemaining), emphasis: true },
   ];
 }
