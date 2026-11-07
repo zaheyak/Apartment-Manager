@@ -138,6 +138,12 @@ function MonthForm({ apartmentId, onDone }) {
     <form className="space-y-4" onSubmit={submit}>
       <Alert>{error}</Alert>
       {preview?.monthExists && <Alert>כבר קיים חיוב לחודש זה.</Alert>}
+      {preview && (preview.electricity.previous == null || preview.water.previous == null) && (
+        <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">
+          <strong>הגדרת קריאות ראשוניות</strong>
+          <p className="mt-1">זו הפעם הראשונה שמוזנות קריאות לדירה. יש להזין את הקריאה שממנה מתחילים ואת הקריאה הנוכחית. מהחודש הבא הקריאה הקודמת תועתק אוטומטית.</p>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="שנה"><TextInput dir="ltr" type="number" min="2000" max="2100" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /></Field>
         <Field label="חודש">
@@ -150,7 +156,7 @@ function MonthForm({ apartmentId, onDone }) {
       <div className="rounded-xl bg-amber-50 p-4">
         <div className="mb-3 font-medium">חשמל</div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} required /></Field>
+          <Field label={preview?.electricity.previous == null ? 'קריאה התחלתית לחשמל' : 'קריאה קודמת (אוטומטית)'}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} readOnly={preview?.electricity.previous != null} required /></Field>
           <Field label="קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} required /></Field>
           <Field label="מחיר להכפלה לקוט״ש"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} required /></Field>
         </div>
@@ -159,7 +165,7 @@ function MonthForm({ apartmentId, onDone }) {
       <div className="rounded-xl bg-sky-50 p-4">
         <div className="mb-3 font-medium">מים</div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} required /></Field>
+          <Field label={preview?.water.previous == null ? 'קריאה התחלתית למים' : 'קריאה קודמת (אוטומטית)'}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} readOnly={preview?.water.previous != null} required /></Field>
           <Field label="קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} required /></Field>
           <Field label="מחיר להכפלה למ״ק"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} required /></Field>
         </div>
@@ -405,7 +411,7 @@ export default function ApartmentPage() {
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.xlsx`, `apartment-${apartment.number}.xlsx`)}>ייצוא Excel</Button>
           <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.pdf`, `apartment-${apartment.number}.pdf`)}>ייצוא PDF</Button>
-          <Button onClick={() => setModal({ type: 'month' })}>חודש חדש</Button>
+          <Button onClick={() => setModal({ type: 'month' })}>{months.length === 0 ? 'הזנת קריאות ראשוניות' : 'חודש חדש'}</Button>
         </div>
       </div>
       <Alert>{error}</Alert>
@@ -420,6 +426,12 @@ export default function ApartmentPage() {
 
       {tab === 'details' && (
         <div className="grid gap-4 lg:grid-cols-2">
+          {months.length === 0 && (
+            <Card className="border-2 border-teal-600 lg:col-span-2" title="מתחילים כאן — הגדרת החודש הראשון">
+              <p className="text-sm text-slate-500">כדי להתחיל לנהל את הדירה, הזינו שכר דירה, קריאה התחלתית וקריאה נוכחית לחשמל ולמים. לאחר השמירה, המערכת תעביר בכל חודש את הקריאה הנוכחית להיות הקריאה הקודמת של החודש הבא.</p>
+              <Button className="mt-4" onClick={() => setModal({ type: 'month' })}>הזנת קריאות ראשוניות</Button>
+            </Card>
+          )}
           {latestMonth && (
             <Card className="lg:col-span-2" title={`חשבון אחרון · ${monthLabel(latestMonth.year, latestMonth.month)}`} action={<Badge status={latestMonth.status} />}>
               <div className="mb-4 grid gap-3 lg:grid-cols-3">
@@ -556,7 +568,7 @@ export default function ApartmentPage() {
         </Card>
       )}
 
-      {modal?.type === 'month' && <Modal title="פתיחת חודש חדש" onClose={() => setModal(null)}><MonthForm apartmentId={id} onDone={load} /></Modal>}
+      {modal?.type === 'month' && <Modal title={months.length === 0 ? 'הזנת קריאות ראשוניות' : 'פתיחת חודש חדש'} onClose={() => setModal(null)}><MonthForm apartmentId={id} onDone={load} /></Modal>}
       {modal?.type === 'editMonth' && <Modal title={`עריכת ${monthLabel(modal.record.year, modal.record.month)}`} onClose={() => setModal(null)}><EditMonthForm apartmentId={id} record={modal.record} onDone={load} /></Modal>}
       {modal?.type === 'payment' && <Modal title="רישום תשלום" onClose={() => setModal(null)}><PaymentForm apartmentId={id} months={months} onDone={load} /></Modal>}
       {modal?.type === 'apartment' && <Modal title="עריכת פרטי הדירה" onClose={() => setModal(null)}><ApartmentEditForm apartment={apartment} onDone={load} /></Modal>}
