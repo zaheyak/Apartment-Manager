@@ -2,8 +2,17 @@
   "name": "apartment-manager",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.2.5",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "build": "npm --prefix frontend run build",
-    "dev": "npm --prefix frontend run dev"
+    "build": "npm --workspace apartment-manager-web run build",
+    "dev": "npm --workspace apartment-manager-web run dev",
+    "start": "npm --workspace apartment-manager-api start"
   }
 }
