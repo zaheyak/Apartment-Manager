@@ -351,6 +351,7 @@ export default function ApartmentPage() {
   const [error, setError] = useState('');
   const [year, setYear] = useState('all');
   const [status, setStatus] = useState('all');
+  const [detailMonthKey, setDetailMonthKey] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -362,6 +363,13 @@ export default function ApartmentPage() {
       ]);
       setApartment(apartmentData);
       setMonths(monthsData);
+      setDetailMonthKey((current) => {
+        const currentExists = monthsData.some(
+          (month) => `${month.year}-${month.month}` === current,
+        );
+        const latest = monthsData.at(-1);
+        return currentExists || !latest ? current : `${latest.year}-${latest.month}`;
+      });
       setPayments(paymentsData);
       setReceipts(receiptsData);
       setModal(null);
@@ -380,10 +388,17 @@ export default function ApartmentPage() {
       remaining: selected.reduce((sum, month) => sum + Number(month.remaining), 0),
     };
   }, [months, year]);
+  const detailMonth = useMemo(
+    () => months.find((month) => `${month.year}-${month.month}` === detailMonthKey)
+      || months.at(-1),
+    [months, detailMonthKey],
+  );
+  const detailMonthIndex = detailMonth
+    ? months.findIndex((month) => month.year === detailMonth.year && month.month === detailMonth.month)
+    : -1;
 
   if (error && !apartment) return <Alert>{error}</Alert>;
   if (!apartment) return <p>טוען את פרטי הדירה...</p>;
-  const latestMonth = months.at(-1);
 
   const tabs = [
     ['details', 'פרטי דירה ודייר'],
@@ -432,17 +447,65 @@ export default function ApartmentPage() {
               <Button className="mt-4" onClick={() => setModal({ type: 'month' })}>הזנת קריאות ראשוניות</Button>
             </Card>
           )}
-          {latestMonth && (
-            <Card className="lg:col-span-2" title={`חשבון אחרון · ${monthLabel(latestMonth.year, latestMonth.month)}`} action={<Badge status={latestMonth.status} />}>
-              <div className="mb-4 grid gap-3 lg:grid-cols-3">
-                <ChargeBlock title="שכר דירה" charge={latestMonth.rent} />
-                <ChargeBlock title="חשמל" charge={latestMonth.electricity} unit="קוט״ש" />
-                <ChargeBlock title="מים" charge={latestMonth.water} unit="מ״ק" />
+          {detailMonth && (
+            <Card
+              className="lg:col-span-2"
+              title={`חשבון חודשי · ${monthLabel(detailMonth.year, detailMonth.month)}`}
+              action={<Badge status={detailMonth.status} />}
+            >
+              <div className="mb-5 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:bg-[#0b1020]">
+                <Button
+                  variant="secondary"
+                  disabled={detailMonthIndex <= 0}
+                  onClick={() => {
+                    const previous = months[detailMonthIndex - 1];
+                    if (previous) setDetailMonthKey(`${previous.year}-${previous.month}`);
+                  }}
+                >
+                  החודש הקודם
+                </Button>
+                <Field label="בחירת חודש">
+                  <Select
+                    value={`${detailMonth.year}-${detailMonth.month}`}
+                    onChange={(event) => setDetailMonthKey(event.target.value)}
+                  >
+                    {[...months].reverse().map((month) => (
+                      <option key={`${month.year}-${month.month}`} value={`${month.year}-${month.month}`}>
+                        {monthLabel(month.year, month.month)}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button
+                  variant="secondary"
+                  disabled={detailMonthIndex < 0 || detailMonthIndex >= months.length - 1}
+                  onClick={() => {
+                    const next = months[detailMonthIndex + 1];
+                    if (next) setDetailMonthKey(`${next.year}-${next.month}`);
+                  }}
+                >
+                  החודש הבא
+                </Button>
+                <Button
+                  className="sm:ms-auto"
+                  onClick={() => downloadFile(
+                    `/api/apartments/${id}/months/${detailMonth.year}/${detailMonth.month}/summary.pdf`,
+                    `monthly-charge-${detailMonth.year}-${detailMonth.month}.pdf`,
+                  )}
+                >
+                  הורדת PDF לחודש
+                </Button>
               </div>
-              <div className="grid gap-3 rounded-xl bg-slate-100 p-4 sm:grid-cols-3 dark:bg-[#0b1020]">
-                <Detail label="סך חיובים" value={formatMoney(latestMonth.totalDue)} />
-                <Detail label="שולם" value={formatMoney(latestMonth.totalPaid)} />
-                <Detail label="יתרה לתשלום" value={formatMoney(latestMonth.remaining)} />
+              <div className="mb-4 grid gap-3 lg:grid-cols-3">
+                <ChargeBlock title="שכר דירה" charge={detailMonth.rent} />
+                <ChargeBlock title="חשמל" charge={detailMonth.electricity} unit="קוט״ש" />
+                <ChargeBlock title="מים" charge={detailMonth.water} unit="מ״ק" />
+              </div>
+              <div className="grid gap-3 rounded-xl bg-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4 dark:bg-[#0b1020]">
+                <Detail label="יתרה מחודשים קודמים" value={formatMoney(detailMonth.openingBalance)} />
+                <Detail label="חיוב החודש" value={formatMoney(detailMonth.totalDue)} />
+                <Detail label="שולם בחודש" value={formatMoney(detailMonth.totalPaid)} />
+                <Detail label="יתרה מצטברת" value={formatMoney(detailMonth.cumulativeRemaining)} />
               </div>
             </Card>
           )}
