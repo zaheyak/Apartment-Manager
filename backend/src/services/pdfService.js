@@ -38,22 +38,306 @@ function drawPair(doc, y, label, value, emphasis = false) {
   return y + rowHeight;
 }
 
-function createDocument() {
-  const doc = new PDFDocument({ size: 'A4', margin: 48 });
+function createDocument(options = {}) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, ...options });
   doc.registerFont('regular', path.join(fontsDir, 'NotoSansHebrew-Regular.ttf'));
   doc.registerFont('bold', path.join(fontsDir, 'NotoSansHebrew-Bold.ttf'));
   return doc;
+}
+
+function collectPdf(doc) {
+  const chunks = [];
+  doc.on('data', (chunk) => chunks.push(chunk));
+  const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+  return { done, finish: () => doc.end() };
+}
+
+function drawProfessionalHeader(doc, title, subtitle) {
+  const contentWidth = doc.page.width - 96;
+  doc.rect(48, 30, contentWidth, 4).fill('#111111');
+  doc.font('bold').fontSize(23).fillColor('#000000');
+  doc.text(visual(title), 230, 50, { width: doc.page.width - 278, align: 'right' });
+  doc.font('regular').fontSize(10.5).fillColor('#000000');
+  doc.text(visual(subtitle), 230, 82, { width: doc.page.width - 278, align: 'right' });
+  doc.font('bold').fontSize(11).fillColor('#000000');
+  doc.text(visual('מערכת ניהול דירות'), 48, 55, { width: 160, align: 'left' });
+  doc.font('regular').fontSize(9).fillColor('#000000');
+  doc.text(visual(formatDate(new Date().toISOString())), 48, 78, { width: 160, align: 'left' });
+  doc.moveTo(48, 108).lineTo(doc.page.width - 48, 108).lineWidth(0.8).strokeColor('#777777').stroke();
+}
+
+function drawClientBox(doc, y, { name, phone, apartment, period, documentNumber }) {
+  const contentWidth = doc.page.width - 96;
+  const rightX = doc.page.width - 295;
+  doc.roundedRect(48, y, contentWidth, 76, 7).fillAndStroke('#f5f5f5', '#b8b8b8');
+  doc.font('bold').fontSize(9).fillColor('#000000');
+  doc.text(visual('לכבוד'), rightX, y + 12, { width: 227, align: 'right' });
+  doc.font('bold').fontSize(14).fillColor('#000000');
+  doc.text(visual(name || 'לא משויך דייר'), rightX, y + 30, { width: 227, align: 'right' });
+  doc.font('regular').fontSize(9.5).fillColor('#000000');
+  if (phone) doc.text(visual(phone), rightX, y + 53, { width: 227, align: 'right' });
+  const details = [
+    apartment ? ['דירה', apartment] : null,
+    period ? ['תקופה', period] : null,
+    documentNumber ? ['מסמך', documentNumber] : null,
+  ].filter(Boolean);
+  doc.font('regular').fontSize(9.5).fillColor('#000000');
+  details.forEach(([label, value], index) => {
+    const lineY = y + 13 + (index * 19);
+    doc.font('bold').text(visual(label), 185, lineY, { width: 91, align: 'right' });
+    doc.font('regular').text(visual(value), 66, lineY, { width: 109, align: 'left' });
+  });
+  return y + 94;
+}
+
+function drawTableHeader(doc, y, columns) {
+  const height = 30;
+  const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  doc.rect(48, y, tableWidth, height).fillAndStroke('#e7e7e7', '#555555');
+  let x = 48;
+  for (const column of columns) {
+    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#777777').stroke();
+    doc.font('bold').fontSize(9.5).fillColor('#000000');
+    doc.text(visual(column.label), x + 7, y + 9, {
+      width: column.width - 14,
+      align: column.align || 'right',
+      lineBreak: false,
+    });
+    x += column.width;
+  }
+  return y + height;
+}
+
+function drawTableRow(doc, y, columns, values, { height = 38, bold = false, fill } = {}) {
+  const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  if (fill) doc.rect(48, y, tableWidth, height).fill(fill);
+  doc.rect(48, y, tableWidth, height).lineWidth(0.5).strokeColor('#9a9a9a').stroke();
+  let x = 48;
+  columns.forEach((column, index) => {
+    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#aaaaaa').stroke();
+    doc.font(bold ? 'bold' : 'regular').fontSize(9.5).fillColor('#000000');
+    doc.text(visual(values[index] ?? '—'), x + 7, y + 10, {
+      width: column.width - 14,
+      align: column.align || 'right',
+      lineBreak: false,
+    });
+    x += column.width;
+  });
+  return y + height;
+}
+
+function drawTotalBox(doc, y, label, value) {
+  doc.roundedRect(287, y, 260, 62, 6).lineWidth(1.5).strokeColor('#111111').stroke();
+  doc.font('regular').fontSize(10).fillColor('#000000');
+  doc.text(visual(label), 307, y + 12, { width: 220, align: 'right' });
+  doc.font('bold').fontSize(20).fillColor('#000000');
+  doc.text(visual(value), 307, y + 31, { width: 220, align: 'right' });
+}
+
+function drawDisclaimer(doc) {
+  doc.font('regular').fontSize(8.5).fillColor('#000000');
+  doc.text(visual('מסמך ניהולי פנימי — אינו חשבונית מס או קבלה כדין.'), 48, doc.page.height - 60, {
+    width: doc.page.width - 96,
+    align: 'center',
+  });
 }
 
 export function renderReceiptPdf(snapshot) {
   if (!fs.existsSync(path.join(fontsDir, 'NotoSansHebrew-Regular.ttf'))) {
     throw new Error('Hebrew font is missing');
   }
-  return renderSummaryPdf({
-    title: 'אישור תשלום',
-    subtitle: 'פרטי התשלום והיתרה לאחר התשלום',
-    rows: paymentReceiptRows(snapshot),
+  const doc = createDocument();
+  const pdf = collectPdf(doc);
+  const remainingAfter = snapshot.accountRemainingAfter
+    ?? snapshot.statement?.cumulativeRemaining
+    ?? snapshot.remainingAfter;
+  const balanceBefore = Number(remainingAfter || 0) + Number(snapshot.paidNow || 0);
+
+  drawProfessionalHeader(doc, 'אישור תשלום', 'פרטי התשלום והיתרה לאחר התשלום');
+  let y = drawClientBox(doc, 126, {
+    name: snapshot.tenantName,
+    phone: snapshot.tenantPhone,
+    apartment: snapshot.apartmentNumber,
+    period: pdfMonthLabel(snapshot.billingYear, snapshot.billingMonth),
+    documentNumber: snapshot.receiptNumber,
   });
+
+  const columns = [
+    { label: 'ערך', width: 190, align: 'left' },
+    { label: 'פרטי התשלום', width: 309, align: 'right' },
+  ];
+  y = drawTableHeader(doc, y, columns);
+  const rows = [
+    ['תאריך התשלום', formatDate(snapshot.paymentDate)],
+    ['סכום ששולם', formatMoney(snapshot.paidNow)],
+    ['אמצעי תשלום', METHOD_LABELS[snapshot.method] || snapshot.method],
+    ['עבור', CATEGORY_LABELS[snapshot.category] || snapshot.category],
+    ...(snapshot.referenceNumber ? [['אסמכתא', snapshot.referenceNumber]] : []),
+  ];
+  for (const [label, value] of rows) {
+    y = drawTableRow(doc, y, columns, [value, label]);
+  }
+  y += 22;
+  const balanceColumns = [
+    { label: 'יתרה לאחר התשלום', width: 166, align: 'center' },
+    { label: 'שולם כעת', width: 166, align: 'center' },
+    { label: 'יתרה לפני התשלום', width: 167, align: 'center' },
+  ];
+  y = drawTableHeader(doc, y, balanceColumns);
+  drawTableRow(doc, y, balanceColumns, [
+    formatMoney(remainingAfter),
+    formatMoney(snapshot.paidNow),
+    formatMoney(balanceBefore),
+  ], { height: 48, bold: true, fill: '#f4f4f4' });
+  drawDisclaimer(doc);
+  pdf.finish();
+  return pdf.done;
+}
+
+export function renderMonthChargePdf(apartment, month) {
+  const doc = createDocument();
+  const pdf = collectPdf(doc);
+  drawProfessionalHeader(doc, 'סיכום חיוב חודשי', 'פירוט שכר דירה חשמל ומים לחודש הנבחר');
+  let y = drawClientBox(doc, 126, {
+    name: apartment.tenantName,
+    phone: apartment.tenantPhone,
+    apartment: apartment.number,
+    period: pdfMonthLabel(month.year, month.month),
+  });
+  const columns = [
+    { label: 'סכום', width: 110, align: 'left' },
+    { label: 'פירוט החישוב', width: 259, align: 'right' },
+    { label: 'סוג חיוב', width: 130, align: 'right' },
+  ];
+  y = drawTableHeader(doc, y, columns);
+  const chargeRows = [
+    [
+      formatMoney(month.rent?.amountDue),
+      pdfMonthLabel(month.year, month.month),
+      'שכר דירה',
+    ],
+    [
+      formatMoney(month.electricity?.amountDue),
+      `${formatQty(month.electricity?.currentReading)} - ${formatQty(month.electricity?.previousReading)} = ${formatQty(month.electricity?.consumption)} × ${formatMoney(month.electricity?.tariffPrice)}`,
+      'חשמל',
+    ],
+    [
+      formatMoney(month.water?.amountDue),
+      `${formatQty(month.water?.currentReading)} - ${formatQty(month.water?.previousReading)} = ${formatQty(month.water?.consumption)} × ${formatMoney(month.water?.tariffPrice)}`,
+      'מים',
+    ],
+  ];
+  for (const row of chargeRows) y = drawTableRow(doc, y, columns, row, { height: 50 });
+  drawTotalBox(doc, y + 28, 'סך כל החיוב לחודש', formatMoney(month.totalDue));
+  drawDisclaimer(doc);
+  pdf.finish();
+  return pdf.done;
+}
+
+function historyPageHeader(doc, report, subtitle) {
+  drawProfessionalHeader(doc, 'דוח כספי מלא', subtitle);
+  return drawClientBox(doc, 126, {
+    name: report.apartment.tenantName,
+    phone: report.apartment.tenantPhone,
+    apartment: report.apartment.number,
+  });
+}
+
+export function renderApartmentHistoryPdf(report) {
+  const doc = createDocument({ layout: 'landscape' });
+  const pdf = collectPdf(doc);
+  const monthColumns = [
+    { label: 'יתרה', width: 95, align: 'left' },
+    { label: 'שולם', width: 95, align: 'left' },
+    { label: 'סה״כ', width: 95, align: 'left' },
+    { label: 'מים', width: 90, align: 'left' },
+    { label: 'חשמל', width: 90, align: 'left' },
+    { label: 'שכר דירה', width: 105, align: 'left' },
+    { label: 'חודש', width: 176, align: 'right' },
+  ];
+  let y = historyPageHeader(doc, report, 'פירוט כל החודשים החיובים התשלומים והיתרות');
+  y = drawTableHeader(doc, y, monthColumns);
+  for (const month of report.months) {
+    if (y + 34 > 530) {
+      drawDisclaimer(doc);
+      doc.addPage();
+      y = historyPageHeader(doc, report, 'המשך פירוט החיובים לפי חודש');
+      y = drawTableHeader(doc, y, monthColumns);
+    }
+    y = drawTableRow(doc, y, monthColumns, [
+      formatMoney(month.remaining),
+      formatMoney(month.totalPaid),
+      formatMoney(month.totalDue),
+      formatMoney(month.water?.amountDue),
+      formatMoney(month.electricity?.amountDue),
+      formatMoney(month.rent?.amountDue),
+      pdfMonthLabel(month.year, month.month),
+    ], { height: 34 });
+  }
+
+  const paymentColumns = [
+    { label: 'אסמכתא', width: 110, align: 'left' },
+    { label: 'סכום', width: 110, align: 'left' },
+    { label: 'אמצעי תשלום', width: 150, align: 'right' },
+    { label: 'עבור חודש', width: 176, align: 'right' },
+    { label: 'תאריך', width: 200, align: 'right' },
+  ];
+  if (y + 100 > 530) {
+    drawDisclaimer(doc);
+    doc.addPage();
+    y = historyPageHeader(doc, report, 'פירוט כל התשלומים');
+  } else {
+    y += 28;
+    doc.font('bold').fontSize(15).fillColor('#000000');
+    doc.text(visual('כל התשלומים'), 48, y, { width: 746, align: 'right' });
+    y += 28;
+  }
+  y = drawTableHeader(doc, y, paymentColumns);
+  if (!report.payments.length) {
+    y = drawTableRow(doc, y, paymentColumns, ['', '', 'לא נרשמו תשלומים', '', '']);
+  } else {
+    for (const payment of report.payments) {
+      if (y + 34 > 530) {
+        drawDisclaimer(doc);
+        doc.addPage();
+        y = historyPageHeader(doc, report, 'המשך פירוט התשלומים');
+        y = drawTableHeader(doc, y, paymentColumns);
+      }
+      y = drawTableRow(doc, y, paymentColumns, [
+        payment.referenceNumber || '—',
+        formatMoney(payment.amount),
+        METHOD_LABELS[payment.method] || payment.method,
+        pdfMonthLabel(payment.billingYear, payment.billingMonth),
+        formatDate(payment.paymentDate),
+      ], { height: 34 });
+    }
+  }
+  const totalDue = report.months.reduce((sum, month) => sum + Number(month.totalDue), 0);
+  const totalPaid = report.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const finalRemaining = report.months.at(-1)?.cumulativeRemaining
+    ?? report.apartment.outstanding
+    ?? 0;
+  if (y + 96 > 530) {
+    drawDisclaimer(doc);
+    doc.addPage();
+    y = historyPageHeader(doc, report, 'סיכום כספי סופי');
+  } else {
+    y += 28;
+  }
+  const totalsColumns = [
+    { label: 'יתרה סופית', width: 249, align: 'center' },
+    { label: 'סך התשלומים', width: 249, align: 'center' },
+    { label: 'סך החיובים', width: 248, align: 'center' },
+  ];
+  y = drawTableHeader(doc, y, totalsColumns);
+  drawTableRow(doc, y, totalsColumns, [
+    formatMoney(finalRemaining),
+    formatMoney(totalPaid),
+    formatMoney(totalDue),
+  ], { height: 52, bold: true, fill: '#f1f1f1' });
+  drawDisclaimer(doc);
+  pdf.finish();
+  return pdf.done;
 }
 
 export function renderSummaryPdf({ title, subtitle, rows }) {
@@ -88,105 +372,10 @@ export function renderSummaryPdf({ title, subtitle, rows }) {
     y = drawPair(doc, y, row.label, row.value, row.emphasis);
   }
   doc.font('regular').fontSize(9).fillColor('#000000');
-  doc.text(visual('המסמך הוא מסמך ניהולי ואינו חשבונית מס או קבלה כדין.'), 48, 790, {
+  doc.text(visual('המסמך הוא מסמך ניהולי ואינו חשבונית מס או קבלה כדין.'), 48, doc.page.height - 60, {
     width: 499,
     align: 'right',
   });
   doc.end();
   return done;
-}
-
-function paymentReceiptRows(snapshot) {
-  const remainingAfter = snapshot.accountRemainingAfter
-    ?? snapshot.statement?.cumulativeRemaining
-    ?? snapshot.remainingAfter;
-  const balanceBefore = Number(remainingAfter || 0) + Number(snapshot.paidNow || 0);
-  return [
-    { label: 'לכבוד', value: snapshot.tenantName || 'לא משויך דייר' },
-    ...(snapshot.tenantPhone ? [{ label: 'טלפון', value: snapshot.tenantPhone }] : []),
-    { label: 'מספר מסמך', value: snapshot.receiptNumber },
-    { label: 'דירה', value: snapshot.apartmentNumber },
-    { label: 'עבור חודש', value: pdfMonthLabel(snapshot.billingYear, snapshot.billingMonth) },
-    { kind: 'heading', text: 'פרטי התשלום' },
-    { label: 'תאריך התשלום', value: formatDate(snapshot.paymentDate) },
-    { label: 'סכום ששולם', value: formatMoney(snapshot.paidNow) },
-    { label: 'אמצעי התשלום', value: METHOD_LABELS[snapshot.method] || snapshot.method },
-    { label: 'עבור', value: CATEGORY_LABELS[snapshot.category] || snapshot.category },
-    ...(snapshot.referenceNumber
-      ? [{ label: 'אסמכתא', value: snapshot.referenceNumber }]
-      : []),
-    ...(snapshot.notes ? [{ label: 'הערות', value: snapshot.notes }] : []),
-    { kind: 'heading', text: 'יתרה' },
-    { label: 'יתרה לפני התשלום', value: formatMoney(balanceBefore) },
-    { label: 'שולם בתשלום זה', value: formatMoney(snapshot.paidNow) },
-    { label: 'יתרה לאחר התשלום', value: formatMoney(remainingAfter), emphasis: true },
-  ];
-}
-
-export function monthChargeRows(apartment, month) {
-  return [
-    { label: 'לכבוד', value: apartment.tenantName || 'לא משויך דייר' },
-    ...(apartment.tenantPhone ? [{ label: 'טלפון', value: apartment.tenantPhone }] : []),
-    { label: 'דירה', value: apartment.number },
-    { label: 'סיכום עבור חודש', value: pdfMonthLabel(month.year, month.month) },
-    { kind: 'heading', text: 'שכר דירה' },
-    { label: 'חיוב שכר דירה לחודש', value: formatMoney(month.rent?.amountDue) },
-    { kind: 'heading', text: 'חשמל' },
-    { label: 'קריאת חשמל קודמת', value: formatQty(month.electricity?.previousReading) },
-    { label: 'קריאת חשמל נוכחית', value: formatQty(month.electricity?.currentReading) },
-    { label: 'צריכת חשמל', value: formatQty(month.electricity?.consumption, 'קוט"ש') },
-    { label: 'מחיר להכפלה', value: `${formatMoney(month.electricity?.tariffPrice)} לכל קוט"ש` },
-    { label: 'חיוב חשמל לחודש', value: formatMoney(month.electricity?.amountDue) },
-    { kind: 'heading', text: 'מים' },
-    { label: 'קריאת מים קודמת', value: formatQty(month.water?.previousReading) },
-    { label: 'קריאת מים נוכחית', value: formatQty(month.water?.currentReading) },
-    { label: 'צריכת מים', value: formatQty(month.water?.consumption, 'מ"ק') },
-    { label: 'מחיר להכפלה', value: `${formatMoney(month.water?.tariffPrice)} לכל מ"ק` },
-    { label: 'חיוב מים לחודש', value: formatMoney(month.water?.amountDue) },
-    { kind: 'heading', text: 'סיכום החיוב החודשי' },
-    { label: 'שכר דירה', value: formatMoney(month.rent?.amountDue) },
-    { label: 'חשמל', value: formatMoney(month.electricity?.amountDue) },
-    { label: 'מים', value: formatMoney(month.water?.amountDue) },
-    { label: 'סך כל החיוב לחודש זה', value: formatMoney(month.totalDue), emphasis: true },
-  ];
-}
-
-export function apartmentHistoryRows(report) {
-  const totalDue = report.months.reduce((sum, month) => sum + Number(month.totalDue), 0);
-  const totalPaid = report.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const finalRemaining = report.months.at(-1)?.cumulativeRemaining
-    ?? report.apartment.outstanding
-    ?? 0;
-  const monthRows = report.months.flatMap((month) => ([
-    { kind: 'heading', text: pdfMonthLabel(month.year, month.month) },
-    { label: 'חיוב שכר דירה', value: formatMoney(month.rent?.amountDue) },
-    { label: 'חיוב חשמל', value: formatMoney(month.electricity?.amountDue) },
-    { label: 'חיוב מים', value: formatMoney(month.water?.amountDue) },
-    { label: 'סך חיוב החודש', value: formatMoney(month.totalDue) },
-    { label: 'שולם עבור החודש', value: formatMoney(month.totalPaid) },
-    { label: 'יתרת החודש', value: formatMoney(month.remaining) },
-  ]));
-  const paymentRows = report.payments.flatMap((payment, index) => ([
-    { kind: 'heading', text: `תשלום ${index + 1}` },
-    { label: 'תאריך', value: formatDate(payment.paymentDate) },
-    { label: 'סכום', value: formatMoney(payment.amount) },
-    { label: 'אמצעי תשלום', value: METHOD_LABELS[payment.method] || payment.method },
-    { label: 'עבור חודש', value: pdfMonthLabel(payment.billingYear, payment.billingMonth) },
-    ...(payment.referenceNumber ? [{ label: 'אסמכתא', value: payment.referenceNumber }] : []),
-  ]));
-  return [
-    { label: 'לכבוד', value: report.apartment.tenantName || 'לא משויך דייר' },
-    ...(report.apartment.tenantPhone
-      ? [{ label: 'טלפון', value: report.apartment.tenantPhone }]
-      : []),
-    { label: 'דירה', value: report.apartment.number },
-    { kind: 'heading', text: 'פירוט חיובים לפי חודש' },
-    ...monthRows,
-    { kind: 'heading', text: 'כל התשלומים' },
-    ...(paymentRows.length ? paymentRows : [{ label: 'תשלומים', value: 'לא נרשמו תשלומים' }]),
-    { kind: 'heading', text: 'סיכום סופי' },
-    { label: 'סך כל החיובים', value: formatMoney(totalDue) },
-    { label: 'סך כל התשלומים', value: formatMoney(totalPaid) },
-    { label: 'הסכום שנשאר לתשלום', value: formatMoney(finalRemaining), emphasis: true },
-  ];
 }

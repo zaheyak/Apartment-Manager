@@ -32,8 +32,8 @@ import { getReceipt, listPayments, listReceipts, recordPayment } from '../servic
 import { apartmentReport, buildingReport, dashboard } from '../services/reportService.js';
 import { addTariff, getSettings, updateBuilding } from '../services/settingsService.js';
 import {
-  apartmentHistoryRows,
-  monthChargeRows,
+  renderApartmentHistoryPdf,
+  renderMonthChargePdf,
   renderReceiptPdf,
   renderSummaryPdf,
 } from '../services/pdfService.js';
@@ -218,11 +218,7 @@ router.get('/apartments/:id/months/:year/:month/summary.pdf', asyncRoute(async (
   const month = Number(req.params.month);
   const record = report.months.find((item) => item.year === year && item.month === month);
   if (!record) throw new AppError(404, 'החודש לא נמצא');
-  const buffer = await renderSummaryPdf({
-    title: 'סיכום חיוב חודשי',
-    subtitle: 'שכר דירה וקריאות חשמל ומים לחודש זה בלבד',
-    rows: monthChargeRows(report.apartment, record),
-  });
+  const buffer = await renderMonthChargePdf(report.apartment, record);
   sendPdf(res, buffer, `monthly-charge-${report.apartment.number}-${year}-${month}.pdf`);
 }));
 
@@ -272,11 +268,7 @@ router.get('/apartments/:id/history.xlsx', asyncRoute(async (req, res) => {
 
 router.get('/apartments/:id/history.pdf', asyncRoute(async (req, res) => {
   const report = await apartmentReport(req.params.id);
-  const buffer = await renderSummaryPdf({
-    title: 'דוח מלא לכל החודשים והתשלומים',
-    subtitle: 'פירוט החיובים, התשלומים והיתרה הסופית',
-    rows: apartmentHistoryRows(report),
-  });
+  const buffer = await renderApartmentHistoryPdf(report);
   sendPdf(res, buffer, `full-history-${report.apartment.number}.pdf`);
 }));
 
