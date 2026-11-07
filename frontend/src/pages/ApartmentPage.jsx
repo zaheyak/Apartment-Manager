@@ -14,7 +14,6 @@ import {
   TextInput,
 } from '../components/ui.jsx';
 import {
-  AUDIT_LABELS,
   CATEGORY_LABELS,
   METHOD_LABELS,
   MONTHS,
@@ -341,7 +340,6 @@ export default function ApartmentPage() {
   const [months, setMonths] = useState([]);
   const [payments, setPayments] = useState([]);
   const [receipts, setReceipts] = useState([]);
-  const [audit, setAudit] = useState([]);
   const [tab, setTab] = useState('details');
   const [modal, setModal] = useState(null);
   const [error, setError] = useState('');
@@ -350,18 +348,16 @@ export default function ApartmentPage() {
 
   const load = useCallback(async () => {
     try {
-      const [apartmentData, monthsData, paymentsData, receiptsData, auditData] = await Promise.all([
+      const [apartmentData, monthsData, paymentsData, receiptsData] = await Promise.all([
         api(`/api/apartments/${id}`),
         api(`/api/apartments/${id}/months`),
         api(`/api/apartments/${id}/payments`),
         api(`/api/apartments/${id}/receipts`),
-        api(`/api/apartments/${id}/audit`),
       ]);
       setApartment(apartmentData);
       setMonths(monthsData);
       setPayments(paymentsData);
       setReceipts(receiptsData);
-      setAudit(auditData);
       setModal(null);
     } catch (err) { setError(err.message); }
   }, [id]);
@@ -388,7 +384,6 @@ export default function ApartmentPage() {
     ['months', 'היסטוריה חודשית'],
     ['payments', 'תשלומים'],
     ['documents', 'מסמכים'],
-    ['audit', 'יומן שינויים'],
   ];
 
   async function finishLease() {
@@ -558,12 +553,6 @@ export default function ApartmentPage() {
           <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">המסמכים הם אישורי תשלום פנימיים ואינם חשבוניות מס או קבלות כדין.</p>
           <div className="space-y-2">{receipts.map((receipt) => <div key={receipt.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"><div><div className="font-medium">{receipt.receiptNumber}</div><div className="text-sm text-slate-500">{formatDate(receipt.snapshot.paymentDate)} · {formatMoney(receipt.snapshot.paidNow)} · {monthLabel(receipt.snapshot.billingYear, receipt.snapshot.billingMonth)}</div></div><Button variant="secondary" onClick={() => downloadFile(`/api/receipts/${receipt.id}/pdf`, `${receipt.receiptNumber}.pdf`)}>הורדה / הדפסה</Button></div>)}</div>
           {receipts.length === 0 && <p className="text-sm text-slate-500">אין מסמכים שמורים.</p>}
-        </Card>
-      )}
-
-      {tab === 'audit' && (
-        <Card title="יומן שינויים">
-          <div className="space-y-3">{audit.map((entry) => <div key={entry.id} className="rounded-xl border border-slate-100 p-3"><div className="flex justify-between gap-3"><span className="font-medium">{AUDIT_LABELS[entry.action] || entry.action}</span><span className="text-sm text-slate-500">{new Date(entry.createdAt).toLocaleString('he-IL')}</span></div>{entry.afterData && <pre className="mt-2 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-xs" dir="ltr">{JSON.stringify(entry.afterData, null, 2)}</pre>}</div>)}</div>
         </Card>
       )}
 
