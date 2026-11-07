@@ -11,7 +11,8 @@
     "frontend"
   ],
   "scripts": {
-    "build": "npm --workspace apartment-manager-web run build",
+    "build": "node -e \"console.log('Backend requires no compilation')\"",
+    "build:frontend": "npm --workspace apartment-manager-web run build",
     "dev": "npm --workspace apartment-manager-web run dev",
     "start": "npm --workspace apartment-manager-api start"
   }
