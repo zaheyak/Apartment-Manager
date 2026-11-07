@@ -12,6 +12,10 @@ import {
 } from '../lib/labels.js';
 
 const fontsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
+const ACCENT = '#0f766e';
+const ACCENT_DARK = '#115e59';
+const ACCENT_LIGHT = '#e8f5f2';
+const BORDER = '#9ccbc4';
 
 function visual(value) {
   // PDFKit splits on ordinary spaces before shaping Hebrew. Keeping the phrase
@@ -28,9 +32,9 @@ function pdfMonthLabel(year, month) {
 
 function drawPair(doc, y, label, value, emphasis = false) {
   const rowHeight = 30;
-  if (emphasis) doc.rect(48, y, 499, rowHeight).fill('#e8e8e8');
-  doc.rect(48, y, 499, rowHeight).lineWidth(0.7).strokeColor('#111111').stroke();
-  doc.moveTo(300, y).lineTo(300, y + rowHeight).strokeColor('#111111').stroke();
+  if (emphasis) doc.rect(48, y, 499, rowHeight).fill(ACCENT_LIGHT);
+  doc.rect(48, y, 499, rowHeight).lineWidth(0.7).strokeColor(BORDER).stroke();
+  doc.moveTo(300, y).lineTo(300, y + rowHeight).strokeColor(BORDER).stroke();
   doc.font('bold').fontSize(10.5).fillColor('#000000');
   doc.text(visual(label), 310, y + 8, { width: 227, align: 'right', lineBreak: false });
   doc.font(emphasis ? 'bold' : 'regular').fontSize(10.5).fillColor('#000000');
@@ -54,23 +58,23 @@ function collectPdf(doc) {
 
 function drawProfessionalHeader(doc, title, subtitle) {
   const contentWidth = doc.page.width - 96;
-  doc.rect(48, 30, contentWidth, 4).fill('#111111');
-  doc.font('bold').fontSize(23).fillColor('#000000');
+  doc.rect(48, 30, contentWidth, 5).fill(ACCENT);
+  doc.font('bold').fontSize(23).fillColor(ACCENT_DARK);
   doc.text(visual(title), 230, 50, { width: doc.page.width - 278, align: 'right' });
   doc.font('regular').fontSize(10.5).fillColor('#000000');
   doc.text(visual(subtitle), 230, 82, { width: doc.page.width - 278, align: 'right' });
-  doc.font('bold').fontSize(11).fillColor('#000000');
+  doc.font('bold').fontSize(11).fillColor(ACCENT_DARK);
   doc.text(visual('מערכת ניהול דירות'), 48, 55, { width: 160, align: 'left' });
   doc.font('regular').fontSize(9).fillColor('#000000');
   doc.text(visual(formatDate(new Date().toISOString())), 48, 78, { width: 160, align: 'left' });
-  doc.moveTo(48, 108).lineTo(doc.page.width - 48, 108).lineWidth(0.8).strokeColor('#777777').stroke();
+  doc.moveTo(48, 108).lineTo(doc.page.width - 48, 108).lineWidth(0.8).strokeColor(BORDER).stroke();
 }
 
 function drawClientBox(doc, y, { name, phone, apartment, period, documentNumber }) {
   const contentWidth = doc.page.width - 96;
   const rightX = doc.page.width - 295;
-  doc.roundedRect(48, y, contentWidth, 76, 7).fillAndStroke('#f5f5f5', '#b8b8b8');
-  doc.font('bold').fontSize(9).fillColor('#000000');
+  doc.roundedRect(48, y, contentWidth, 76, 7).fillAndStroke(ACCENT_LIGHT, BORDER);
+  doc.font('bold').fontSize(9).fillColor(ACCENT_DARK);
   doc.text(visual('לכבוד'), rightX, y + 12, { width: 227, align: 'right' });
   doc.font('bold').fontSize(14).fillColor('#000000');
   doc.text(visual(name || 'לא משויך דייר'), rightX, y + 30, { width: 227, align: 'right' });
@@ -93,11 +97,11 @@ function drawClientBox(doc, y, { name, phone, apartment, period, documentNumber 
 function drawTableHeader(doc, y, columns) {
   const height = 30;
   const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
-  doc.rect(48, y, tableWidth, height).fillAndStroke('#e7e7e7', '#555555');
+  doc.rect(48, y, tableWidth, height).fillAndStroke(ACCENT, ACCENT_DARK);
   let x = 48;
   for (const column of columns) {
-    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#777777').stroke();
-    doc.font('bold').fontSize(9.5).fillColor('#000000');
+    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#d7efeb').stroke();
+    doc.font('bold').fontSize(9.5).fillColor('#ffffff');
     doc.text(visual(column.label), x + 7, y + 9, {
       width: column.width - 14,
       align: column.align || 'right',
@@ -111,10 +115,10 @@ function drawTableHeader(doc, y, columns) {
 function drawTableRow(doc, y, columns, values, { height = 38, bold = false, fill } = {}) {
   const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
   if (fill) doc.rect(48, y, tableWidth, height).fill(fill);
-  doc.rect(48, y, tableWidth, height).lineWidth(0.5).strokeColor('#9a9a9a').stroke();
+  doc.rect(48, y, tableWidth, height).lineWidth(0.5).strokeColor(BORDER).stroke();
   let x = 48;
   columns.forEach((column, index) => {
-    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#aaaaaa').stroke();
+    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor(BORDER).stroke();
     doc.font(bold ? 'bold' : 'regular').fontSize(9.5).fillColor('#000000');
     doc.text(visual(values[index] ?? '—'), x + 7, y + 10, {
       width: column.width - 14,
@@ -127,19 +131,11 @@ function drawTableRow(doc, y, columns, values, { height = 38, bold = false, fill
 }
 
 function drawTotalBox(doc, y, label, value) {
-  doc.roundedRect(287, y, 260, 62, 6).lineWidth(1.5).strokeColor('#111111').stroke();
-  doc.font('regular').fontSize(10).fillColor('#000000');
+  doc.roundedRect(287, y, 260, 62, 6).fillAndStroke(ACCENT_LIGHT, ACCENT);
+  doc.font('regular').fontSize(10).fillColor(ACCENT_DARK);
   doc.text(visual(label), 307, y + 12, { width: 220, align: 'right' });
-  doc.font('bold').fontSize(20).fillColor('#000000');
+  doc.font('bold').fontSize(20).fillColor(ACCENT_DARK);
   doc.text(visual(value), 307, y + 31, { width: 220, align: 'right' });
-}
-
-function drawDisclaimer(doc) {
-  doc.font('regular').fontSize(8.5).fillColor('#000000');
-  doc.text(visual('מסמך ניהולי פנימי — אינו חשבונית מס או קבלה כדין.'), 48, doc.page.height - 60, {
-    width: doc.page.width - 96,
-    align: 'center',
-  });
 }
 
 export function renderReceiptPdf(snapshot) {
@@ -188,8 +184,7 @@ export function renderReceiptPdf(snapshot) {
     formatMoney(remainingAfter),
     formatMoney(snapshot.paidNow),
     formatMoney(balanceBefore),
-  ], { height: 48, bold: true, fill: '#f4f4f4' });
-  drawDisclaimer(doc);
+  ], { height: 48, bold: true, fill: ACCENT_LIGHT });
   pdf.finish();
   return pdf.done;
 }
@@ -205,31 +200,42 @@ export function renderMonthChargePdf(apartment, month) {
     period: pdfMonthLabel(month.year, month.month),
   });
   const columns = [
-    { label: 'סכום', width: 110, align: 'left' },
-    { label: 'פירוט החישוב', width: 259, align: 'right' },
-    { label: 'סוג חיוב', width: 130, align: 'right' },
+    { label: 'סכום', width: 85, align: 'center' },
+    { label: 'תעריף', width: 80, align: 'center' },
+    { label: 'צריכה', width: 80, align: 'center' },
+    { label: 'נוכחית', width: 80, align: 'center' },
+    { label: 'קודמת', width: 80, align: 'center' },
+    { label: 'סוג חיוב', width: 94, align: 'right' },
   ];
   y = drawTableHeader(doc, y, columns);
   const chargeRows = [
     [
       formatMoney(month.rent?.amountDue),
-      pdfMonthLabel(month.year, month.month),
+      '—',
+      '—',
+      '—',
+      '—',
       'שכר דירה',
     ],
     [
       formatMoney(month.electricity?.amountDue),
-      `${formatQty(month.electricity?.currentReading)} - ${formatQty(month.electricity?.previousReading)} = ${formatQty(month.electricity?.consumption)} × ${formatMoney(month.electricity?.tariffPrice)}`,
+      formatMoney(month.electricity?.tariffPrice),
+      formatQty(month.electricity?.consumption),
+      formatQty(month.electricity?.currentReading),
+      formatQty(month.electricity?.previousReading),
       'חשמל',
     ],
     [
       formatMoney(month.water?.amountDue),
-      `${formatQty(month.water?.currentReading)} - ${formatQty(month.water?.previousReading)} = ${formatQty(month.water?.consumption)} × ${formatMoney(month.water?.tariffPrice)}`,
+      formatMoney(month.water?.tariffPrice),
+      formatQty(month.water?.consumption),
+      formatQty(month.water?.currentReading),
+      formatQty(month.water?.previousReading),
       'מים',
     ],
   ];
-  for (const row of chargeRows) y = drawTableRow(doc, y, columns, row, { height: 50 });
+  for (const row of chargeRows) y = drawTableRow(doc, y, columns, row, { height: 44 });
   drawTotalBox(doc, y + 28, 'סך כל החיוב לחודש', formatMoney(month.totalDue));
-  drawDisclaimer(doc);
   pdf.finish();
   return pdf.done;
 }
@@ -259,7 +265,6 @@ export function renderApartmentHistoryPdf(report) {
   y = drawTableHeader(doc, y, monthColumns);
   for (const month of report.months) {
     if (y + 34 > 530) {
-      drawDisclaimer(doc);
       doc.addPage();
       y = historyPageHeader(doc, report, 'המשך פירוט החיובים לפי חודש');
       y = drawTableHeader(doc, y, monthColumns);
@@ -283,7 +288,6 @@ export function renderApartmentHistoryPdf(report) {
     { label: 'תאריך', width: 200, align: 'right' },
   ];
   if (y + 100 > 530) {
-    drawDisclaimer(doc);
     doc.addPage();
     y = historyPageHeader(doc, report, 'פירוט כל התשלומים');
   } else {
@@ -298,7 +302,6 @@ export function renderApartmentHistoryPdf(report) {
   } else {
     for (const payment of report.payments) {
       if (y + 34 > 530) {
-        drawDisclaimer(doc);
         doc.addPage();
         y = historyPageHeader(doc, report, 'המשך פירוט התשלומים');
         y = drawTableHeader(doc, y, paymentColumns);
@@ -318,7 +321,6 @@ export function renderApartmentHistoryPdf(report) {
     ?? report.apartment.outstanding
     ?? 0;
   if (y + 96 > 530) {
-    drawDisclaimer(doc);
     doc.addPage();
     y = historyPageHeader(doc, report, 'סיכום כספי סופי');
   } else {
@@ -334,8 +336,7 @@ export function renderApartmentHistoryPdf(report) {
     formatMoney(finalRemaining),
     formatMoney(totalPaid),
     formatMoney(totalDue),
-  ], { height: 52, bold: true, fill: '#f1f1f1' });
-  drawDisclaimer(doc);
+  ], { height: 52, bold: true, fill: ACCENT_LIGHT });
   pdf.finish();
   return pdf.done;
 }
@@ -345,37 +346,33 @@ export function renderSummaryPdf({ title, subtitle, rows }) {
   const chunks = [];
   doc.on('data', (chunk) => chunks.push(chunk));
   const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
-  doc.fillColor('#000000').font('bold').fontSize(22);
+  doc.rect(48, 30, 499, 5).fill(ACCENT);
+  doc.fillColor(ACCENT_DARK).font('bold').fontSize(22);
   doc.text(visual(title), 48, 42, { width: 499, align: 'right' });
   doc.font('regular').fontSize(11).fillColor('#000000');
   doc.text(visual(subtitle), 48, 73, { width: 499, align: 'right' });
-  doc.moveTo(48, 98).lineTo(547, 98).lineWidth(1.2).strokeColor('#000000').stroke();
+  doc.moveTo(48, 98).lineTo(547, 98).lineWidth(1.2).strokeColor(BORDER).stroke();
 
   let y = 116;
   for (const row of rows) {
     const neededHeight = row.kind === 'heading' ? 38 : 30;
     if (y + neededHeight > 752) {
       doc.addPage();
-      doc.fillColor('#000000').font('bold').fontSize(13);
+      doc.fillColor(ACCENT_DARK).font('bold').fontSize(13);
       doc.text(visual(title), 48, 38, { width: 499, align: 'right' });
-      doc.moveTo(48, 62).lineTo(547, 62).lineWidth(0.8).strokeColor('#000000').stroke();
+      doc.moveTo(48, 62).lineTo(547, 62).lineWidth(0.8).strokeColor(BORDER).stroke();
       y = 78;
     }
     if (row.kind === 'heading') {
       y += 8;
-      doc.rect(48, y, 499, 30).fillAndStroke('#f1f1f1', '#111111');
-      doc.font('bold').fontSize(12).fillColor('#000000');
+      doc.rect(48, y, 499, 30).fillAndStroke(ACCENT_LIGHT, BORDER);
+      doc.font('bold').fontSize(12).fillColor(ACCENT_DARK);
       doc.text(visual(row.text), 58, y + 8, { width: 479, align: 'right', lineBreak: false });
       y += 30;
       continue;
     }
     y = drawPair(doc, y, row.label, row.value, row.emphasis);
   }
-  doc.font('regular').fontSize(9).fillColor('#000000');
-  doc.text(visual('המסמך הוא מסמך ניהולי ואינו חשבונית מס או קבלה כדין.'), 48, doc.page.height - 60, {
-    width: 499,
-    align: 'right',
-  });
   doc.end();
   return done;
 }
