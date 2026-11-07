@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../App.jsx';
+import { useAuth, useTheme } from '../App.jsx';
 import { Alert, Button, Field, TextInput } from '../components/ui.jsx';
 
 export default function LoginPage() {
   const { admin, ready, login } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,7 +27,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="relative grid min-h-screen lg:grid-cols-2">
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="absolute left-4 top-4 z-10 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm shadow-sm"
+      >
+        {theme === 'dark' ? '☀ מצב בהיר' : '☾ מצב כהה'}
+      </button>
       <section className="hidden flex-col justify-between bg-slate-950 p-12 text-white lg:flex">
         <div className="text-sm text-teal-200">מערכת למנהל הנכס</div>
         <div>
@@ -35,8 +43,8 @@ export default function LoginPage() {
         </div>
         <div className="text-sm text-slate-400">הגישה שמורה למנהל בלבד. לדיירים אין חשבון במערכת.</div>
       </section>
-      <section className="flex items-center justify-center p-6">
-        <form className="w-full max-w-md space-y-5 rounded-3xl bg-white p-8 shadow-sm" onSubmit={onSubmit}>
+      <section className="flex items-center justify-center p-4 sm:p-6">
+        <form className="w-full max-w-md space-y-5 rounded-3xl bg-white p-6 shadow-sm sm:p-8" onSubmit={onSubmit}>
           <div>
             <h2 className="text-2xl font-semibold">כניסת מנהל</h2>
             <p className="mt-1 text-sm text-slate-500">הזינו את פרטי המנהל כדי להיכנס למערכת.</p>

@@ -46,7 +46,7 @@ function ChargeBlock({ title, charge, unit }) {
     <div className="rounded-xl border border-slate-100 p-3 text-sm">
       <div className="mb-2 flex items-center justify-between"><strong>{title}</strong><Badge status={charge.status} /></div>
       {charge.previousReading != null && (
-        <div className="mb-2 grid grid-cols-4 gap-2 text-xs text-slate-500">
+        <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-slate-500 sm:grid-cols-4">
           <span>קודם: {formatQty(charge.previousReading)}</span>
           <span>נוכחי: {formatQty(charge.currentReading)}</span>
           <span>צריכה: {formatQty(charge.consumption)} {unit}</span>
@@ -54,7 +54,7 @@ function ChargeBlock({ title, charge, unit }) {
         </div>
       )}
       {charge.consumption != null && <div className="mb-2 text-xs text-slate-500">{formatQty(charge.consumption)} × {formatMoney(charge.tariffPrice)} = {formatMoney(charge.amountDue)}</div>}
-      <div className="grid grid-cols-3 gap-2"><span>חיוב {formatMoney(charge.amountDue)}</span><span>שולם {formatMoney(charge.amountPaid)}</span><span>יתרה {formatMoney(charge.remaining)}</span></div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><span>חיוב {formatMoney(charge.amountDue)}</span><span>שולם {formatMoney(charge.amountPaid)}</span><span>יתרה {formatMoney(charge.remaining)}</span></div>
       {charge.paymentDetails?.length > 0 && (
         <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-500">
           {charge.paymentDetails.map((payment) => (
@@ -400,7 +400,7 @@ export default function ApartmentPage() {
   }
 
   return (
-    <div className="apartment-dark -m-4 min-h-[calc(100vh-57px)] space-y-6 bg-[#070b17] p-4 md:-m-8 md:p-8">
+    <div className="apartment-page -m-4 min-h-[calc(100vh-57px)] space-y-6 p-4 sm:-m-6 sm:p-6 lg:-m-8 lg:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link to="/apartments" className="text-sm text-teal-800">חזרה לכל הדירות</Link>
@@ -432,7 +432,7 @@ export default function ApartmentPage() {
                 <ChargeBlock title="חשמל" charge={latestMonth.electricity} unit="קוט״ש" />
                 <ChargeBlock title="מים" charge={latestMonth.water} unit="מ״ק" />
               </div>
-              <div className="grid gap-3 rounded-xl bg-[#0b1020] p-4 sm:grid-cols-3">
+              <div className="grid gap-3 rounded-xl bg-slate-100 p-4 sm:grid-cols-3 dark:bg-[#0b1020]">
                 <Detail label="סך חיובים" value={formatMoney(latestMonth.totalDue)} />
                 <Detail label="שולם" value={formatMoney(latestMonth.totalPaid)} />
                 <Detail label="יתרה לתשלום" value={formatMoney(latestMonth.remaining)} />

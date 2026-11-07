@@ -4,47 +4,105 @@
 
 body {
   margin: 0;
-  background: #f1f5f9;
+  background: #f4f7fb;
   color: #0f172a;
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 input, select, textarea, button {
   font-family: inherit;
 }
 
-.apartment-dark {
-  color: #e2e8f0;
+html {
+  color-scheme: light;
 }
 
-.apartment-dark .bg-white {
-  background-color: #11182a;
+html.dark {
+  color-scheme: dark;
 }
 
-.apartment-dark .bg-slate-50,
-.apartment-dark .bg-slate-100 {
-  background-color: #0b1020;
+.dark body {
+  background: #070b17;
+  color: #e5edf7;
 }
 
-.apartment-dark .text-slate-500,
-.apartment-dark .text-slate-600,
-.apartment-dark .text-slate-700,
-.apartment-dark .text-slate-800 {
-  color: #94a3b8;
+.dark .bg-white,
+.dark .bg-white\/90 {
+  background-color: #111827;
 }
 
-.apartment-dark .border-slate-100,
-.apartment-dark .border-slate-200 {
+.dark .bg-slate-50 {
+  background-color: #0d1526;
+}
+
+.dark .bg-slate-100 {
+  background-color: #182235;
+}
+
+.dark .text-slate-400,
+.dark .text-slate-500,
+.dark .text-slate-600,
+.dark .text-slate-700,
+.dark .text-slate-800 {
+  color: #a8b5c7;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
   border-color: #26324a;
 }
 
-.apartment-dark input,
-.apartment-dark select,
-.apartment-dark textarea {
+.dark input,
+.dark select,
+.dark textarea {
   border-color: #334155;
   background: #0b1020;
   color: #e2e8f0;
 }
 
-.apartment-dark table tbody tr:hover {
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b;
+}
+
+.dark table tbody tr:hover {
   background: #151f35;
+}
+
+.dark .bg-amber-50 {
+  background-color: #302510;
+}
+
+.dark .bg-sky-50 {
+  background-color: #0b293a;
+}
+
+.dark .bg-rose-50 {
+  background-color: #35151f;
+}
+
+.dark .bg-emerald-50 {
+  background-color: #0d2d24;
+}
+
+.dark .text-amber-800,
+.dark .text-amber-900 {
+  color: #fcd34d;
+}
+
+.dark .text-rose-800,
+.dark .text-rose-900 {
+  color: #fda4af;
+}
+
+.dark .text-emerald-800 {
+  color: #6ee7b7;
+}
+
+.dark aside .bg-white {
+  background-color: #f8fafc;
+}
+
+.dark aside .bg-white.text-slate-950 {
+  color: #0f172a;
 }
