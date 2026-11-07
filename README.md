@@ -46,6 +46,7 @@ npm audit --omit=dev
    - `DATABASE_SSL=true`
    - `JWT_SECRET` — ערך אקראי ארוך
    - `CORS_ORIGIN` — כתובת ה־Vercel
+   - `VERCEL_PROJECT_NAME` ו־`VERCEL_TEAM_SLUG` — מאפשרים גם כתובות Preview של אותו פרויקט בלבד
    - `ADMIN_USERNAME`
    - `ADMIN_EMAIL`
    - `ADMIN_PASSWORD` — משמש רק ביצירת המנהל הראשונה

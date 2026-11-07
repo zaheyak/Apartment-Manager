@@ -28,6 +28,8 @@ export const config = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  vercelProjectName: process.env.VERCEL_PROJECT_NAME || 'apartment-manager',
+  vercelTeamSlug: process.env.VERCEL_TEAM_SLUG || 'zaheyas-projects',
   adminUsername: process.env.ADMIN_USERNAME || 'Rani',
   adminEmail: process.env.ADMIN_EMAIL || 'rani@apartment.local',
   adminPassword: process.env.ADMIN_PASSWORD || '',
