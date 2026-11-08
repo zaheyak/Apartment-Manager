@@ -101,7 +101,7 @@ function drawTableHeader(doc, y, columns) {
   let x = 48;
   for (const column of columns) {
     if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#dbe4ee').stroke();
-    doc.font('bold').fontSize(11.5).fillColor('#ffffff');
+    doc.font('bold').fontSize(12).fillColor('#ffffff');
     doc.text(visual(column.label), x + 5, y + 9, {
       width: column.width - 10,
       align: column.align || 'right',
@@ -200,12 +200,12 @@ export function renderMonthChargePdf(apartment, month) {
     period: pdfMonthLabel(month.year, month.month),
   });
   const columns = [
-    { label: 'סכום', width: 85, align: 'center' },
-    { label: 'תעריף', width: 80, align: 'center' },
-    { label: 'צריכה', width: 80, align: 'center' },
-    { label: 'נוכחית', width: 80, align: 'center' },
-    { label: 'קודמת', width: 80, align: 'center' },
-    { label: 'סוג חיוב', width: 94, align: 'right' },
+    { label: 'סכום', width: 90, align: 'center' },
+    { label: 'תעריף', width: 72, align: 'center' },
+    { label: 'צריכה', width: 72, align: 'center' },
+    { label: 'קריאה נוכחית', width: 92, align: 'center' },
+    { label: 'קריאה קודמת', width: 92, align: 'center' },
+    { label: 'סוג חיוב', width: 81, align: 'right' },
   ];
   y = drawTableHeader(doc, y, columns);
   const chargeRows = [
