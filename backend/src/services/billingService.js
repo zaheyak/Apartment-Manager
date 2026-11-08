@@ -298,12 +298,7 @@ async function allocatedCents(client, chargeId) {
   return toCents(rows[0].paid);
 }
 
-async function removeUtilityCharge(client, charge) {
-  const paid = await allocatedCents(client, charge.id);
-  if (paid > 0) {
-    throw new AppError(400, 'לא ניתן למחוק קריאה שכבר הוקצה אליה תשלום');
-  }
-  const carriedReading = Number(charge.previous_reading);
+async function rebaseNextUtilityCharge(client, apartmentId, category, year, month, carriedReading) {
   const { rows } = await client.query(
     `SELECT *
      FROM monthly_charges
@@ -313,51 +308,98 @@ async function removeUtilityCharge(client, charge) {
      ORDER BY charge_year, charge_month
      LIMIT 1
      FOR UPDATE`,
-    [charge.apartment_id, charge.category, charge.charge_year, charge.charge_month],
+    [apartmentId, category, year, month],
   );
   const next = rows[0];
-  let updatedNext = null;
-  if (next) {
-    const current = Number(next.current_reading);
-    if (current < carriedReading) {
-      throw new AppError(400, 'לא ניתן למחוק את הקריאה משום שהקריאה הבאה נמוכה מהקריאה שתועבר');
-    }
-    const consumption = roundQty(current - carriedReading);
-    const amount = chargeAmount(consumption, Number(next.tariff_price));
-    const nextPaid = await allocatedCents(client, next.id);
-    if (toCents(amount) < nextPaid) {
-      throw new AppError(400, 'לא ניתן למחוק את הקריאה משום שהחיוב הבא כבר שולם בסכום גבוה יותר');
-    }
-    await client.query(
-      `UPDATE meter_readings
-       SET previous_value = $1::numeric(14,3),
-           consumption = current_value - $1::numeric(14,3)
-       WHERE id = $2`,
-      [carriedReading, next.meter_reading_id],
-    );
-    await client.query(
-      `UPDATE monthly_charges
-       SET previous_reading = $1::numeric(14,3),
-           consumption = current_reading - $1::numeric(14,3),
-           amount_due = $2,
-           updated_at = now()
-       WHERE id = $3`,
-      [carriedReading, amount, next.id],
-    );
-    updatedNext = {
-      year: next.charge_year,
-      month: next.charge_month,
-      previous: carriedReading,
-      current,
-      consumption,
-      amount,
-    };
+  if (!next) return null;
+  const current = Number(next.current_reading);
+  if (current < carriedReading) {
+    throw new AppError(400, 'הקריאה הבאה נמוכה מהקריאה החדשה ולא ניתן לעדכן את הרצף');
   }
+  const consumption = roundQty(current - carriedReading);
+  const amount = chargeAmount(consumption, Number(next.tariff_price));
+  const nextPaid = await allocatedCents(client, next.id);
+  if (toCents(amount) < nextPaid) {
+    throw new AppError(400, 'לא ניתן לשנות את רצף הקריאות משום שהחיוב הבא כבר שולם בסכום גבוה יותר');
+  }
+  await client.query(
+    `UPDATE meter_readings
+     SET previous_value = $1::numeric(14,3),
+         consumption = current_value - $1::numeric(14,3)
+     WHERE id = $2`,
+    [carriedReading, next.meter_reading_id],
+  );
+  await client.query(
+    `UPDATE monthly_charges
+     SET previous_reading = $1::numeric(14,3),
+         consumption = current_reading - $1::numeric(14,3),
+         amount_due = $2,
+         updated_at = now()
+     WHERE id = $3`,
+    [carriedReading, amount, next.id],
+  );
+  return {
+    year: next.charge_year,
+    month: next.charge_month,
+    previous: carriedReading,
+    current,
+    consumption,
+    amount,
+  };
+}
+
+async function removeUtilityCharge(client, charge) {
+  const paid = await allocatedCents(client, charge.id);
+  if (paid > 0) {
+    throw new AppError(400, 'לא ניתן למחוק קריאה שכבר הוקצה אליה תשלום');
+  }
+  const carriedReading = Number(charge.previous_reading);
+  const updatedNext = await rebaseNextUtilityCharge(
+    client,
+    charge.apartment_id,
+    charge.category,
+    charge.charge_year,
+    charge.charge_month,
+    carriedReading,
+  );
   await client.query('DELETE FROM monthly_charges WHERE id = $1', [charge.id]);
   if (charge.meter_reading_id) {
     await client.query('DELETE FROM meter_readings WHERE id = $1', [charge.meter_reading_id]);
   }
   return { removed: true, carriedReading, updatedNext };
+}
+
+async function addUtilityCharge(client, apartmentId, year, month, category, label, readingInput) {
+  if (!readingInput || readingInput.remove) return null;
+  const tariff = readingInput.tariffPrice ?? await tariffFor(client, category, year, month);
+  const reading = resolveReading(
+    label,
+    readingInput,
+    await previousReading(client, apartmentId, category, year, month),
+  );
+  const updatedNext = await rebaseNextUtilityCharge(
+    client,
+    apartmentId,
+    category,
+    year,
+    month,
+    reading.current,
+  );
+  await insertUtility(client, {
+    apartmentId,
+    year,
+    month,
+    category,
+    reading,
+    tariff,
+  });
+  return {
+    added: true,
+    ...reading,
+    tariffPrice: tariff,
+    amount: chargeAmount(reading.consumption, tariff),
+    updatedNext,
+  };
 }
 
 async function updateUtilityCharge(client, charge, readingInput) {
@@ -430,8 +472,12 @@ export async function updateMonth(apartmentId, year, month, input, adminId) {
         [input.rentAmount, byCategory.rent.id],
       );
     }
-    const electricity = await updateUtilityCharge(client, byCategory.electricity, input.electricity);
-    const water = await updateUtilityCharge(client, byCategory.water, input.water);
+    const electricity = byCategory.electricity
+      ? await updateUtilityCharge(client, byCategory.electricity, input.electricity)
+      : await addUtilityCharge(client, apartmentId, year, month, 'electricity', 'חשמל', input.electricity);
+    const water = byCategory.water
+      ? await updateUtilityCharge(client, byCategory.water, input.water)
+      : await addUtilityCharge(client, apartmentId, year, month, 'water', 'מים', input.water);
     await audit(client, adminId, apartmentId, 'update_month', { year, month, charges: before }, {
       year,
       month,

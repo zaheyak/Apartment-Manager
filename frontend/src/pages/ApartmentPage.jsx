@@ -182,25 +182,54 @@ function EditMonthForm({ apartmentId, record, onDone }) {
     waterTariff: record.water?.tariffPrice || '',
   });
   const [error, setError] = useState('');
+  const [readingDefaults, setReadingDefaults] = useState(null);
+
+  useEffect(() => {
+    if (record.electricity && record.water) return;
+    api(`/api/apartments/${apartmentId}/reading-preview?year=${record.year}&month=${record.month}`)
+      .then((data) => {
+        setReadingDefaults(data);
+        setForm((current) => ({
+          ...current,
+          electricityPrevious: record.electricity ? current.electricityPrevious : (data.electricity.previous ?? ''),
+          electricityTariff: record.electricity ? current.electricityTariff : data.electricity.tariff,
+          waterPrevious: record.water ? current.waterPrevious : (data.water.previous ?? ''),
+          waterTariff: record.water ? current.waterTariff : data.water.tariff,
+        }));
+      })
+      .catch((err) => setError(err.message));
+  }, [apartmentId, record]);
 
   async function submit(event) {
     event.preventDefault();
     setError('');
+    const utilityPayload = (existing, previous, current, tariffPrice) => {
+      if (current === '') return existing ? { remove: true } : undefined;
+      return {
+        ...(previous !== '' ? { previous: Number(previous) } : {}),
+        current: Number(current),
+        tariffPrice: Number(tariffPrice),
+      };
+    };
+    const electricity = utilityPayload(
+      record.electricity,
+      form.electricityPrevious,
+      form.electricityCurrent,
+      form.electricityTariff,
+    );
+    const water = utilityPayload(
+      record.water,
+      form.waterPrevious,
+      form.waterCurrent,
+      form.waterTariff,
+    );
     try {
       await api(`/api/apartments/${apartmentId}/months/${record.year}/${record.month}`, {
         method: 'PATCH',
         body: JSON.stringify({
           ...(record.rent ? { rentAmount: Number(form.rentAmount) } : {}),
-          ...(record.electricity ? {
-            electricity: form.electricityCurrent === ''
-              ? { remove: true }
-              : { previous: Number(form.electricityPrevious), current: Number(form.electricityCurrent), tariffPrice: Number(form.electricityTariff) },
-          } : {}),
-          ...(record.water ? {
-            water: form.waterCurrent === ''
-              ? { remove: true }
-              : { previous: Number(form.waterPrevious), current: Number(form.waterCurrent), tariffPrice: Number(form.waterTariff) },
-          } : {}),
+          ...(electricity ? { electricity } : {}),
+          ...(water ? { water } : {}),
         }),
       });
       onDone();
@@ -216,12 +245,12 @@ function EditMonthForm({ apartmentId, record, onDone }) {
       <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">מחיקת קריאה נוכחית תסיר את חיוב המונה מהחודש ותעביר את הקריאה הקודמת לחודש הבא שבו קיימת קריאה.</p>
       {record.rent && <Field label="שכר דירה"><TextInput dir="ltr" type="number" min="0" step="0.01" value={form.rentAmount} onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} /></Field>}
       <div className="grid gap-3 sm:grid-cols-3">
-        {record.electricity && <Field label="חשמל — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} /></Field>}
-        {record.electricity && <Field label="חשמל — קריאה נוכחית (לא חובה)"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} /></Field>}
-        {record.electricity && <Field label="חשמל — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} /></Field>}
-        {record.water && <Field label="מים — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} /></Field>}
-        {record.water && <Field label="מים — קריאה נוכחית (לא חובה)"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} /></Field>}
-        {record.water && <Field label="מים — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} /></Field>}
+        <Field label={`חשמל — קריאה קודמת${record.electricity || readingDefaults?.electricity.previous != null ? ' (אוטומטית)' : ''}`}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} readOnly={!record.electricity && readingDefaults?.electricity.previous != null} required={form.electricityCurrent !== '' && form.electricityPrevious === ''} /></Field>
+        <Field label="חשמל — קריאה נוכחית (לא חובה)"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} /></Field>
+        <Field label="חשמל — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} required={form.electricityCurrent !== ''} /></Field>
+        <Field label={`מים — קריאה קודמת${record.water || readingDefaults?.water.previous != null ? ' (אוטומטית)' : ''}`}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} readOnly={!record.water && readingDefaults?.water.previous != null} required={form.waterCurrent !== '' && form.waterPrevious === ''} /></Field>
+        <Field label="מים — קריאה נוכחית (לא חובה)"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} /></Field>
+        <Field label="מים — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} required={form.waterCurrent !== ''} /></Field>
       </div>
       <Button>שמירת שינויים</Button>
     </form>

@@ -360,6 +360,19 @@ await request(`/apartments/${apartment.id}/months`, {
     water: { current: 170.74, tariffPrice: 8.5 },
   },
 });
+const afterAddingMissingReading = await request(`/apartments/${apartment.id}/months/${testYear}/8`, {
+  method: 'PATCH',
+  ...auth,
+  body: {
+    electricity: { current: 1650, tariffPrice: 0.8 },
+  },
+});
+const augustAfterAddedReading = afterAddingMissingReading.find((month) => month.month === 8);
+const septemberAfterAddedReading = afterAddingMissingReading.find((month) => month.month === 9);
+assert(augustAfterAddedReading.electricity.previousReading === '1600.000', 'missing reading uses previous known reading');
+assert(augustAfterAddedReading.electricity.amountDue === '40.00', 'missing reading added during edit');
+assert(septemberAfterAddedReading.electricity.previousReading === '1650.000', 'next reading rebased after adding missing reading');
+assert(septemberAfterAddedReading.electricity.consumption === '50.000', 'next consumption recalculated after adding reading');
 const afterClearedReading = await request(`/apartments/${apartment.id}/months/${testYear}/9`, {
   method: 'PATCH',
   ...auth,
