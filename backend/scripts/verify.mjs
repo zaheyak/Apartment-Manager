@@ -122,6 +122,7 @@ const partial = await request(`/apartments/${apartment.id}/payments`, {
     billingYear: testYear,
     billingMonth: 1,
     referenceNumber: 'TR-100',
+    notes: 'הערת בדיקה עבור אישור התשלום',
   },
 });
 assert(partial.snapshot.totalDue === '3807.55', 'receipt total');
@@ -135,6 +136,7 @@ assert(partial.snapshot.statement.electricity.previousReading === '1000.000', 'r
 assert(partial.snapshot.statement.water.currentReading === '120.740', 'receipt water reading');
 assert(partial.snapshot.statement.cumulativeRemaining === '1807.55', 'receipt accumulated balance');
 assert(partial.snapshot.accountRemainingAfter === '1807.55', 'payment receipt remaining balance');
+assert(partial.snapshot.notes === 'הערת בדיקה עבור אישור התשלום', 'receipt payment note');
 
 const rest = await request(`/apartments/${apartment.id}/payments`, {
   method: 'POST',

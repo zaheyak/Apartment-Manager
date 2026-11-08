@@ -137,6 +137,45 @@ function drawTotalBox(doc, y, label, value) {
   doc.text(visual(value), 307, y + 31, { width: 220, align: 'right' });
 }
 
+function wrappedVisual(value, maxLineLength = 65) {
+  const lines = [];
+  for (const paragraph of String(value || '').split(/\r?\n/)) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && candidate.length > maxLineLength) {
+        lines.push(visual(line));
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) lines.push(visual(line));
+  }
+  return lines;
+}
+
+function drawNoteBox(doc, y, note) {
+  const lines = wrappedVisual(note);
+  if (!lines.length) return y;
+  const height = Math.max(66, 42 + (lines.length * 18));
+  if (y + height > doc.page.height - 48) {
+    doc.addPage();
+    y = 48;
+  }
+  doc.roundedRect(48, y, 499, height, 7).fillAndStroke(ACCENT_LIGHT, BORDER);
+  doc.font('bold').fontSize(13).fillColor(ACCENT_DARK);
+  doc.text(visual('הערה'), 68, y + 12, { width: 459, align: 'right' });
+  doc.font('bold').fontSize(12.5).fillColor('#000000');
+  doc.text(lines.join('\n'), 68, y + 35, {
+    width: 459,
+    align: 'right',
+    lineGap: 3,
+  });
+  return y + height;
+}
+
 export function renderReceiptPdf(snapshot) {
   if (
     !fs.existsSync(path.join(fontsDir, 'Heebo-Regular.ttf'))
@@ -181,11 +220,12 @@ export function renderReceiptPdf(snapshot) {
     { label: 'יתרה לפני התשלום', width: 167, align: 'center' },
   ];
   y = drawTableHeader(doc, y, balanceColumns);
-  drawTableRow(doc, y, balanceColumns, [
+  y = drawTableRow(doc, y, balanceColumns, [
     formatMoney(remainingAfter),
     formatMoney(snapshot.paidNow),
     formatMoney(balanceBefore),
   ], { height: 48, bold: true, fill: ACCENT_LIGHT });
+  if (snapshot.notes) drawNoteBox(doc, y + 20, snapshot.notes);
   pdf.finish();
   return pdf.done;
 }
