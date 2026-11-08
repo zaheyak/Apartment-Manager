@@ -70,8 +70,8 @@ export const monthSchema = z.object({
   year: z.number().int().min(2000).max(2100),
   month: z.number().int().min(1).max(12),
   rentAmount: z.number().nonnegative().optional(),
-  electricity: readingSchema,
-  water: readingSchema,
+  electricity: readingSchema.optional(),
+  water: readingSchema.optional(),
 });
 
 const excelImportRowSchema = z

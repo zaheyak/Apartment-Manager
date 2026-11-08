@@ -323,6 +323,33 @@ const importedJuly = importResult.months.find((month) => month.month === 7);
 assert(importedJuly.rent === null && importedJuly.water === null, 'electricity-only month has no unrelated charges');
 assert(importedJuly.electricity.amountDue === '64.00', 'electricity-only Excel month imported');
 
+const skippedReadingMonth = await request(`/apartments/${apartment.id}/months`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    year: testYear,
+    month: 8,
+    rentAmount: 3300,
+  },
+});
+const august = skippedReadingMonth.find((month) => month.month === 8);
+assert(august.rent.amountDue === '3300.00', 'manual rent-only month created');
+assert(august.electricity === null && august.water === null, 'blank current readings create no utility charges');
+const afterSkippedReading = await request(`/apartments/${apartment.id}/months`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    year: testYear,
+    month: 9,
+    rentAmount: 3300,
+    electricity: { current: 1700, tariffPrice: 0.8 },
+    water: { current: 160.74, tariffPrice: 8.5 },
+  },
+});
+const september = afterSkippedReading.find((month) => month.month === 9);
+assert(september.electricity.previousReading === '1600.000', 'electricity reading carried across blank month');
+assert(september.water.previousReading === '150.740', 'water reading carried across blank months');
+
 const pdf = await fetch(`${base}/receipts/${partial.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
 const bytes = Buffer.from(await pdf.arrayBuffer());
 assert(pdf.ok && bytes.subarray(0, 4).toString() === '%PDF', 'receipt pdf');
@@ -354,7 +381,8 @@ const xlsx = await fetch(`${base}/apartments/${apartment.id}/history.xlsx`, {
 const sheet = Buffer.from(await xlsx.arrayBuffer());
 assert(xlsx.ok && sheet.subarray(0, 2).toString() === 'PK', 'excel export');
 
-const balanceBeforeDeleteTest = importResult.months.at(-1).cumulativeRemaining;
+const monthsBeforeDeleteTest = await request(`/apartments/${apartment.id}/months?year=${testYear}`, auth);
+const balanceBeforeDeleteTest = monthsBeforeDeleteTest.at(-1).cumulativeRemaining;
 const paymentToDelete = await request(`/apartments/${apartment.id}/payments`, {
   method: 'POST',
   ...auth,

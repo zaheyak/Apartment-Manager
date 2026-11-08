@@ -104,16 +104,20 @@ function MonthForm({ apartmentId, onDone }) {
           year: Number(form.year),
           month: Number(form.month),
           rentAmount: Number(form.rentAmount),
-          electricity: {
-            previous: Number(form.electricityPrevious),
-            current: Number(form.electricityCurrent),
-            tariffPrice: Number(form.electricityTariff),
-          },
-          water: {
-            previous: Number(form.waterPrevious),
-            current: Number(form.waterCurrent),
-            tariffPrice: Number(form.waterTariff),
-          },
+          ...(form.electricityCurrent !== '' ? {
+            electricity: {
+              ...(form.electricityPrevious !== '' ? { previous: Number(form.electricityPrevious) } : {}),
+              current: Number(form.electricityCurrent),
+              tariffPrice: Number(form.electricityTariff),
+            },
+          } : {}),
+          ...(form.waterCurrent !== '' ? {
+            water: {
+              ...(form.waterPrevious !== '' ? { previous: Number(form.waterPrevious) } : {}),
+              current: Number(form.waterCurrent),
+              tariffPrice: Number(form.waterTariff),
+            },
+          } : {}),
         }),
       });
       onDone();
@@ -143,19 +147,21 @@ function MonthForm({ apartmentId, onDone }) {
       <Field label="שכר דירה"><TextInput dir="ltr" type="number" min="0" step="0.01" value={form.rentAmount} onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} required /></Field>
       <div className="rounded-xl bg-amber-50 p-4">
         <div className="mb-3 font-medium">חשמל</div>
+        <p className="mb-3 text-sm text-amber-900">אין קריאה החודש? השאירו את הקריאה הנוכחית ריקה. הקריאה האחרונה תישמר לחודש הבא.</p>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label={preview?.electricity.previous == null ? 'קריאה התחלתית לחשמל' : 'קריאה קודמת (אוטומטית)'}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} readOnly={preview?.electricity.previous != null} required /></Field>
-          <Field label="קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} required /></Field>
-          <Field label="מחיר להכפלה לקוט״ש"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} required /></Field>
+          <Field label={preview?.electricity.previous == null ? 'קריאה התחלתית לחשמל' : 'קריאה קודמת (אוטומטית)'}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} readOnly={preview?.electricity.previous != null} required={form.electricityCurrent !== '' && preview?.electricity.previous == null} /></Field>
+          <Field label="קריאה נוכחית (לא חובה)"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} /></Field>
+          <Field label="מחיר להכפלה לקוט״ש"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} required={form.electricityCurrent !== ''} /></Field>
         </div>
         <div className="mt-3 rounded-lg bg-white/70 p-3 text-sm">צריכה: <strong>{formatQty(electricityUsage)} קוט״ש</strong> × {formatMoney(form.electricityTariff)} = <strong>{formatMoney(electricityTotal)}</strong></div>
       </div>
       <div className="rounded-xl bg-sky-50 p-4">
         <div className="mb-3 font-medium">מים</div>
+        <p className="mb-3 text-sm text-sky-900">אין קריאה החודש? השאירו את הקריאה הנוכחית ריקה. הקריאה האחרונה תישמר לחודש הבא.</p>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label={preview?.water.previous == null ? 'קריאה התחלתית למים' : 'קריאה קודמת (אוטומטית)'}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} readOnly={preview?.water.previous != null} required /></Field>
-          <Field label="קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} required /></Field>
-          <Field label="מחיר להכפלה למ״ק"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} required /></Field>
+          <Field label={preview?.water.previous == null ? 'קריאה התחלתית למים' : 'קריאה קודמת (אוטומטית)'}><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} readOnly={preview?.water.previous != null} required={form.waterCurrent !== '' && preview?.water.previous == null} /></Field>
+          <Field label="קריאה נוכחית (לא חובה)"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} /></Field>
+          <Field label="מחיר להכפלה למ״ק"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} required={form.waterCurrent !== ''} /></Field>
         </div>
         <div className="mt-3 rounded-lg bg-white/70 p-3 text-sm">צריכה: <strong>{formatQty(waterUsage)} מ״ק</strong> × {formatMoney(form.waterTariff)} = <strong>{formatMoney(waterTotal)}</strong></div>
       </div>

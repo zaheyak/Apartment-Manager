@@ -133,42 +133,54 @@ async function createMonthInTransaction(client, apartmentId, input, adminId, { s
 
   const lease = await activeLease(client, apartmentId);
   const rentAmount = input.rentAmount ?? (lease ? Number(lease.monthly_rent) : 0);
-  const electricityTariff = input.electricity.tariffPrice
-    ?? await tariffFor(client, 'electricity', input.year, input.month);
-  const waterTariff = input.water.tariffPrice
-    ?? await tariffFor(client, 'water', input.year, input.month);
-  const electricity = resolveReading(
-    'חשמל',
-    input.electricity,
-    await previousReading(client, apartmentId, 'electricity', input.year, input.month),
-  );
-  const water = resolveReading(
-    'מים',
-    input.water,
-    await previousReading(client, apartmentId, 'water', input.year, input.month),
-  );
+  const electricityTariff = input.electricity
+    ? input.electricity.tariffPrice
+      ?? await tariffFor(client, 'electricity', input.year, input.month)
+    : null;
+  const waterTariff = input.water
+    ? input.water.tariffPrice
+      ?? await tariffFor(client, 'water', input.year, input.month)
+    : null;
+  const electricity = input.electricity
+    ? resolveReading(
+      'חשמל',
+      input.electricity,
+      await previousReading(client, apartmentId, 'electricity', input.year, input.month),
+    )
+    : null;
+  const water = input.water
+    ? resolveReading(
+      'מים',
+      input.water,
+      await previousReading(client, apartmentId, 'water', input.year, input.month),
+    )
+    : null;
 
   await client.query(
     `INSERT INTO monthly_charges (apartment_id, lease_id, charge_year, charge_month, category, amount_due)
      VALUES ($1, $2, $3, $4, 'rent', $5)`,
     [apartmentId, lease?.id ?? null, input.year, input.month, rentAmount],
   );
-  await insertUtility(client, {
-    apartmentId,
-    year: input.year,
-    month: input.month,
-    category: 'electricity',
-    reading: electricity,
-    tariff: electricityTariff,
-  });
-  await insertUtility(client, {
-    apartmentId,
-    year: input.year,
-    month: input.month,
-    category: 'water',
-    reading: water,
-    tariff: waterTariff,
-  });
+  if (electricity) {
+    await insertUtility(client, {
+      apartmentId,
+      year: input.year,
+      month: input.month,
+      category: 'electricity',
+      reading: electricity,
+      tariff: electricityTariff,
+    });
+  }
+  if (water) {
+    await insertUtility(client, {
+      apartmentId,
+      year: input.year,
+      month: input.month,
+      category: 'water',
+      reading: water,
+      tariff: waterTariff,
+    });
+  }
   await audit(client, adminId, apartmentId, 'create_month', null, {
     year: input.year,
     month: input.month,
