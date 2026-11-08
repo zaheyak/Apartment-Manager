@@ -12,10 +12,10 @@ import {
 } from '../lib/labels.js';
 
 const fontsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
-const ACCENT = '#17365d';
-const ACCENT_DARK = '#0b1f3a';
-const ACCENT_LIGHT = '#eef3f8';
-const BORDER = '#9aaabd';
+const ACCENT = '#0f766e';
+const ACCENT_DARK = '#115e59';
+const ACCENT_LIGHT = '#e8f5f2';
+const BORDER = '#9ccbc4';
 
 function visual(value) {
   // PDFKit splits on ordinary spaces before shaping Hebrew. Keeping the phrase
@@ -100,7 +100,7 @@ function drawTableHeader(doc, y, columns) {
   doc.rect(48, y, tableWidth, height).fillAndStroke(ACCENT, ACCENT_DARK);
   let x = 48;
   for (const column of columns) {
-    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#dbe4ee').stroke();
+    if (x > 48) doc.moveTo(x, y).lineTo(x, y + height).strokeColor('#d7efeb').stroke();
     doc.font('bold').fontSize(12).fillColor('#ffffff');
     doc.text(visual(column.label), x + 5, y + 9, {
       width: column.width - 10,
