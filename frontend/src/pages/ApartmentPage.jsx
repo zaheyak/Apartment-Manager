@@ -380,14 +380,6 @@ export default function ApartmentPage() {
 
   const years = useMemo(() => [...new Set(months.map((month) => month.year))].sort((a, b) => b - a), [months]);
   const filteredMonths = useMemo(() => months.filter((month) => (year === 'all' || month.year === Number(year)) && (status === 'all' || month.status === status)).reverse(), [months, year, status]);
-  const annual = useMemo(() => {
-    const selected = year === 'all' ? months : months.filter((month) => month.year === Number(year));
-    return {
-      due: selected.reduce((sum, month) => sum + Number(month.totalDue), 0),
-      paid: selected.reduce((sum, month) => sum + Number(month.totalPaid), 0),
-      remaining: selected.reduce((sum, month) => sum + Number(month.remaining), 0),
-    };
-  }, [months, year]);
   const detailMonth = useMemo(
     () => months.find((month) => `${month.year}-${month.month}` === detailMonthKey)
       || months.at(-1),
@@ -537,11 +529,6 @@ export default function ApartmentPage() {
 
       {tab === 'months' && (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Stat label="סך חיובים בתקופה" value={formatMoney(annual.due)} />
-            <Stat label="סך ששולם בתקופה" value={formatMoney(annual.paid)} />
-            <Stat label="יתרה בתקופה" value={formatMoney(annual.remaining)} />
-          </div>
           <Card>
             <div className="mb-4 flex flex-wrap gap-3">
               <Select className="max-w-48" value={year} onChange={(e) => setYear(e.target.value)}><option value="all">כל השנים</option>{years.map((value) => <option key={value} value={value}>{value}</option>)}</Select>
