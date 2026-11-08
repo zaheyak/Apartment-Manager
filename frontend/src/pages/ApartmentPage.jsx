@@ -210,7 +210,7 @@ function EditMonthForm({ apartmentId, record, onDone }) {
   return (
     <form className="space-y-4" onSubmit={submit}>
       <Alert>{error}</Alert>
-      <p className="text-sm text-slate-500">העדכון נשמר ביומן הביקורת. שינוי מחיר ההכפלה ישפיע רק על החודש הזה.</p>
+      <p className="text-sm text-slate-500">שינוי מחיר ההכפלה ישפיע רק על החודש הזה.</p>
       <Field label="שכר דירה"><TextInput dir="ltr" type="number" min="0" step="0.01" value={form.rentAmount} onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} /></Field>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="חשמל — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} /></Field>
