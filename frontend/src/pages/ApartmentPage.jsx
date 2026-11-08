@@ -42,20 +42,20 @@ function Detail({ label, value }) {
 function ChargeBlock({ title, charge, unit }) {
   if (!charge) return null;
   return (
-    <div className="rounded-xl border border-slate-100 p-3 text-sm">
-      <div className="mb-2 flex items-center justify-between"><strong>{title}</strong><Badge status={charge.status} /></div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-3 flex items-center justify-between"><strong className="text-base">{title}</strong><Badge status={charge.status} /></div>
       {charge.previousReading != null && (
-        <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-slate-500 sm:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4 dark:text-slate-300">
           <span>קודם: {formatQty(charge.previousReading)}</span>
           <span>נוכחי: {formatQty(charge.currentReading)}</span>
           <span>צריכה: {formatQty(charge.consumption)} {unit}</span>
           <span>כפול: {formatMoney(charge.tariffPrice)}</span>
         </div>
       )}
-      {charge.consumption != null && <div className="mb-2 text-xs text-slate-500">{formatQty(charge.consumption)} × {formatMoney(charge.tariffPrice)} = {formatMoney(charge.amountDue)}</div>}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3"><span>חיוב {formatMoney(charge.amountDue)}</span><span>שולם {formatMoney(charge.amountPaid)}</span><span>יתרה {formatMoney(charge.remaining)}</span></div>
+      {charge.consumption != null && <div className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-200">{formatQty(charge.consumption)} × {formatMoney(charge.tariffPrice)} = {formatMoney(charge.amountDue)}</div>}
+      <div className="grid grid-cols-1 gap-2 font-semibold sm:grid-cols-3"><span>חיוב {formatMoney(charge.amountDue)}</span><span>שולם {formatMoney(charge.amountPaid)}</span><span>יתרה {formatMoney(charge.remaining)}</span></div>
       {charge.paymentDetails?.length > 0 && (
-        <div className="mt-3 space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-500">
+        <div className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
           {charge.paymentDetails.map((payment) => (
             <div key={`${payment.paymentId}-${payment.amount}`} className="flex flex-wrap justify-between gap-2">
               <span>{formatDate(payment.paymentDate)} · {METHOD_LABELS[payment.method]}</span>
@@ -64,7 +64,7 @@ function ChargeBlock({ title, charge, unit }) {
           ))}
         </div>
       )}
-      {charge.paidThroughDate && <div className="mt-1 text-xs text-slate-500">שולם עד {formatDate(charge.paidThroughDate)}</div>}
+      {charge.paidThroughDate && <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">שולם עד {formatDate(charge.paidThroughDate)}</div>}
     </div>
   );
 }
@@ -547,7 +547,50 @@ export default function ApartmentPage() {
               <Select className="max-w-48" value={year} onChange={(e) => setYear(e.target.value)}><option value="all">כל השנים</option>{years.map((value) => <option key={value} value={value}>{value}</option>)}</Select>
               <Select className="max-w-48" value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">כל הסטטוסים</option><option value="unpaid">לא שולם</option><option value="partial">שולם חלקית</option><option value="paid">שולם</option></Select>
             </div>
-            <div className="mb-6 overflow-auto rounded-xl border border-slate-200">
+            <div className="space-y-4">
+              {filteredMonths.map((month) => (
+                <div key={`${month.year}-${month.month}`} className="overflow-hidden rounded-3xl border border-teal-200 bg-gradient-to-bl from-white via-white to-teal-50 shadow-sm dark:border-teal-900 dark:from-slate-900 dark:via-slate-900 dark:to-teal-950/40">
+                  <div className="h-1.5 bg-teal-700" />
+                  <div className="p-5 sm:p-6">
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-teal-700 dark:text-teal-300">סיכום חשבון חודשי</div>
+                        <h3 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{monthLabel(month.year, month.month)}</h3>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge status={month.status} />
+                        <Button variant="secondary" onClick={() => setModal({ type: 'editMonth', record: month })}>עריכת החודש</Button>
+                        <Button onClick={() => downloadFile(`/api/apartments/${id}/months/${month.year}/${month.month}/summary.pdf`, `monthly-charge-${month.year}-${month.month}.pdf`)}>הורדת PDF לחודש</Button>
+                      </div>
+                    </div>
+                    <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        ['יתרה מחודשים קודמים', month.openingBalance],
+                        ['חיוב החודש', month.totalDue],
+                        ['שולם בחודש', month.totalPaid],
+                        ['יתרה מצטברת', month.cumulativeRemaining],
+                      ].map(([label, value], index) => (
+                        <div key={label} className={`rounded-2xl border p-4 ${index === 3 ? 'border-teal-300 bg-teal-700 text-white dark:border-teal-700' : 'border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-800'}`}>
+                          <div className={`text-sm font-semibold ${index === 3 ? 'text-teal-50' : 'text-slate-500 dark:text-slate-300'}`}>{label}</div>
+                          <div className="mt-2 text-xl font-bold">{formatMoney(value)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid gap-3 lg:grid-cols-3">
+                      <ChargeBlock title="שכר דירה" charge={month.rent} />
+                      <ChargeBlock title="חשמל" charge={month.electricity} unit="קוט״ש" />
+                      <ChargeBlock title="מים" charge={month.water} unit="מ״ק" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {filteredMonths.length === 0 && <p className="text-sm text-slate-500">אין חודשים להצגה.</p>}
+            </div>
+            <div className="mb-3 mt-8">
+              <h3 className="text-lg font-bold">טבלת היסטוריה חודשית מפורטת</h3>
+              <p className="mt-1 text-sm text-slate-500">ניתן לגלול לצדדים כדי לראות את כל נתוני החיובים, הקריאות והתשלומים.</p>
+            </div>
+            <div className="overflow-auto rounded-xl border border-slate-200">
               <table className="min-w-[2600px] text-right text-xs">
                 <thead className="sticky top-0 bg-slate-100 text-slate-600">
                   <tr>
@@ -590,22 +633,6 @@ export default function ApartmentPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-            <div className="space-y-4">
-              {filteredMonths.map((month) => (
-                <div key={`${month.year}-${month.month}`} className="rounded-2xl border border-slate-200 p-4">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <div><h3 className="font-semibold">{monthLabel(month.year, month.month)}</h3><p className="text-sm text-slate-500">יתרת פתיחה {formatMoney(month.openingBalance)} · חיוב החודש {formatMoney(month.totalDue)} · שולם {formatMoney(month.totalPaid)} · יתרה מצטברת {formatMoney(month.cumulativeRemaining)}</p></div>
-                    <div className="flex flex-wrap gap-2"><Badge status={month.status} /><Button variant="ghost" onClick={() => setModal({ type: 'editMonth', record: month })}>עריכה</Button><Button variant="ghost" onClick={() => downloadFile(`/api/apartments/${id}/months/${month.year}/${month.month}/summary.pdf`, `monthly-charge-${month.year}-${month.month}.pdf`)}>PDF סיכום חיוב החודש</Button></div>
-                  </div>
-                  <div className="grid gap-3 lg:grid-cols-3">
-                    <ChargeBlock title="שכר דירה" charge={month.rent} />
-                    <ChargeBlock title="חשמל" charge={month.electricity} unit="קוט״ש" />
-                    <ChargeBlock title="מים" charge={month.water} unit="מ״ק" />
-                  </div>
-                </div>
-              ))}
-              {filteredMonths.length === 0 && <p className="text-sm text-slate-500">אין חודשים להצגה.</p>}
             </div>
           </Card>
         </div>
