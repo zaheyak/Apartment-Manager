@@ -199,6 +199,57 @@ export async function createMonth(apartmentId, input, adminId) {
   }
 }
 
+async function importMonthPartsInTransaction(client, apartmentId, input, adminId) {
+  const existing = await client.query(
+    `SELECT category FROM monthly_charges
+     WHERE apartment_id = $1 AND charge_year = $2 AND charge_month = $3`,
+    [apartmentId, input.year, input.month],
+  );
+  const existingCategories = new Set(existing.rows.map((row) => row.category));
+  const importedCategories = [];
+
+  if (input.rentAmount != null && !existingCategories.has('rent')) {
+    const lease = await activeLease(client, apartmentId);
+    await client.query(
+      `INSERT INTO monthly_charges (apartment_id, lease_id, charge_year, charge_month, category, amount_due)
+       VALUES ($1, $2, $3, $4, 'rent', $5)`,
+      [apartmentId, lease?.id ?? null, input.year, input.month, input.rentAmount],
+    );
+    importedCategories.push('rent');
+  }
+
+  for (const [category, label] of [['electricity', 'חשמל'], ['water', 'מים']]) {
+    const readingInput = input[category];
+    if (!readingInput || existingCategories.has(category)) continue;
+    const tariff = readingInput.tariffPrice
+      ?? await tariffFor(client, category, input.year, input.month);
+    const reading = resolveReading(
+      label,
+      readingInput,
+      await previousReading(client, apartmentId, category, input.year, input.month),
+    );
+    await insertUtility(client, {
+      apartmentId,
+      year: input.year,
+      month: input.month,
+      category,
+      reading,
+      tariff,
+    });
+    importedCategories.push(category);
+  }
+
+  if (importedCategories.length) {
+    await audit(client, adminId, apartmentId, 'create_month', null, {
+      year: input.year,
+      month: input.month,
+      source: 'excel_import',
+      importedCategories,
+    });
+  }
+  return importedCategories.length > 0;
+}
+
 export async function importMonths(apartmentId, rows, adminId) {
   const client = await pool.connect();
   let imported = 0;
@@ -209,13 +260,7 @@ export async function importMonths(apartmentId, rows, adminId) {
     if (!apartment.rows[0]) throw new AppError(404, 'הדירה לא נמצאה');
     const ordered = [...rows].sort((a, b) => (a.year * 12 + a.month) - (b.year * 12 + b.month));
     for (const row of ordered) {
-      const created = await createMonthInTransaction(
-        client,
-        apartmentId,
-        { ...row, source: 'excel_import' },
-        adminId,
-        { skipExisting: true },
-      );
+      const created = await importMonthPartsInTransaction(client, apartmentId, row, adminId);
       if (created) imported += 1;
       else skipped += 1;
     }

@@ -85,7 +85,7 @@ function detectTable(workbook) {
   if (!best || best.score < 6 || !best.fields.month) {
     throw new AppError(
       400,
-      'לא נמצאה טבלה מתאימה. נדרשות לפחות עמודת חודש ועמודות קריאה נוכחית לחשמל ולמים.',
+      'לא נמצאה טבלה מתאימה. נדרשת עמודת חודש ולפחות עמודת שכר דירה או קריאת מונה.',
     );
   }
   return best;
@@ -135,6 +135,15 @@ function parsePeriod(monthValue, yearValue, defaultYear) {
 }
 
 function resolvedUtility(raw, label) {
+  const hasValues = Object.values(raw).some((value) => value != null);
+  if (!hasValues) {
+    return {
+      data: null,
+      consumption: null,
+      errors: [],
+      warnings: [],
+    };
+  }
   let previous = raw.previous;
   let current = raw.current;
   let consumption = raw.consumption;
@@ -188,12 +197,17 @@ export async function previewApartmentExcel(apartmentId, buffer, defaultYear) {
   const table = detectTable(workbook);
   const { worksheet, rowNumber: headerRow, fields } = table;
   const existing = await pool.query(
-    `SELECT DISTINCT charge_year, charge_month
+    `SELECT charge_year, charge_month, category
      FROM monthly_charges
      WHERE apartment_id = $1`,
     [apartmentId],
   );
-  const existingKeys = new Set(existing.rows.map((row) => `${row.charge_year}-${row.charge_month}`));
+  const existingByMonth = new Map();
+  for (const row of existing.rows) {
+    const key = `${row.charge_year}-${row.charge_month}`;
+    if (!existingByMonth.has(key)) existingByMonth.set(key, new Set());
+    existingByMonth.get(key).add(row.category);
+  }
   const rows = [];
   const seen = new Set();
 
@@ -230,21 +244,33 @@ export async function previewApartmentExcel(apartmentId, buffer, defaultYear) {
       tariffPrice: numeric(value('waterTariff')),
       amount: numeric(value('waterCharge')),
     }, 'מים');
+    const rentAmount = numeric(value('rentAmount'));
     const key = `${period.year}-${period.month}`;
-    const duplicate = existingKeys.has(key) || seen.has(key);
+    const providedCategories = [
+      rentAmount != null ? 'rent' : null,
+      electricity.data ? 'electricity' : null,
+      water.data ? 'water' : null,
+    ].filter(Boolean);
+    const existingCategories = existingByMonth.get(key) || new Set();
+    const duplicateInFile = seen.has(key);
+    const duplicate = providedCategories.length > 0
+      && providedCategories.every((category) => existingCategories.has(category));
     seen.add(key);
     const errors = [...electricity.errors, ...water.errors];
     const warnings = [...electricity.warnings, ...water.warnings];
-    if (existingKeys.has(key)) warnings.push('החודש כבר קיים במערכת וידולג');
-    if (duplicate && !existingKeys.has(key)) errors.push('החודש מופיע יותר מפעם אחת בקובץ');
-    const rentAmount = numeric(value('rentAmount'));
+    if (!providedCategories.length) errors.push('לא נמצאו בשורה שכר דירה או קריאות מונה');
+    if (duplicate) warnings.push('כל הנתונים בשורה כבר קיימים במערכת והשורה תידלג');
+    else if (providedCategories.some((category) => existingCategories.has(category))) {
+      warnings.push('חלק מהנתונים כבר קיימים; רק הנתונים החסרים ייובאו');
+    }
+    if (duplicateInFile) errors.push('החודש מופיע יותר מפעם אחת בקובץ');
     rows.push({
       sourceRow: rowNumber,
       year: period.year,
       month: period.month,
       ...(rentAmount != null ? { rentAmount } : {}),
-      electricity: electricity.data,
-      water: water.data,
+      ...(electricity.data ? { electricity: electricity.data } : {}),
+      ...(water.data ? { water: water.data } : {}),
       electricityConsumption: electricity.consumption,
       waterConsumption: water.consumption,
       errors,

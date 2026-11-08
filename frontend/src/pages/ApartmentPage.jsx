@@ -184,9 +184,13 @@ function EditMonthForm({ apartmentId, record, onDone }) {
       await api(`/api/apartments/${apartmentId}/months/${record.year}/${record.month}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          rentAmount: Number(form.rentAmount),
-          electricity: { previous: Number(form.electricityPrevious), current: Number(form.electricityCurrent), tariffPrice: Number(form.electricityTariff) },
-          water: { previous: Number(form.waterPrevious), current: Number(form.waterCurrent), tariffPrice: Number(form.waterTariff) },
+          ...(record.rent ? { rentAmount: Number(form.rentAmount) } : {}),
+          ...(record.electricity ? {
+            electricity: { previous: Number(form.electricityPrevious), current: Number(form.electricityCurrent), tariffPrice: Number(form.electricityTariff) },
+          } : {}),
+          ...(record.water ? {
+            water: { previous: Number(form.waterPrevious), current: Number(form.waterCurrent), tariffPrice: Number(form.waterTariff) },
+          } : {}),
         }),
       });
       onDone();
@@ -199,14 +203,14 @@ function EditMonthForm({ apartmentId, record, onDone }) {
     <form className="space-y-4" onSubmit={submit}>
       <Alert>{error}</Alert>
       <p className="text-sm text-slate-500">שינוי מחיר ההכפלה ישפיע רק על החודש הזה.</p>
-      <Field label="שכר דירה"><TextInput dir="ltr" type="number" min="0" step="0.01" value={form.rentAmount} onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} /></Field>
+      {record.rent && <Field label="שכר דירה"><TextInput dir="ltr" type="number" min="0" step="0.01" value={form.rentAmount} onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} /></Field>}
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="חשמל — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} /></Field>
-        <Field label="חשמל — קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} /></Field>
-        <Field label="חשמל — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} /></Field>
-        <Field label="מים — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} /></Field>
-        <Field label="מים — קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} /></Field>
-        <Field label="מים — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} /></Field>
+        {record.electricity && <Field label="חשמל — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityPrevious} onChange={(e) => setForm({ ...form, electricityPrevious: e.target.value })} /></Field>}
+        {record.electricity && <Field label="חשמל — קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.electricityCurrent} onChange={(e) => setForm({ ...form, electricityCurrent: e.target.value })} /></Field>}
+        {record.electricity && <Field label="חשמל — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.electricityTariff} onChange={(e) => setForm({ ...form, electricityTariff: e.target.value })} /></Field>}
+        {record.water && <Field label="מים — קריאה קודמת"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterPrevious} onChange={(e) => setForm({ ...form, waterPrevious: e.target.value })} /></Field>}
+        {record.water && <Field label="מים — קריאה נוכחית"><TextInput dir="ltr" type="number" min="0" step="0.001" value={form.waterCurrent} onChange={(e) => setForm({ ...form, waterCurrent: e.target.value })} /></Field>}
+        {record.water && <Field label="מים — מחיר להכפלה"><TextInput dir="ltr" type="number" min="0" step="0.0001" value={form.waterTariff} onChange={(e) => setForm({ ...form, waterTariff: e.target.value })} /></Field>}
       </div>
       <Button>שמירת שינויים</Button>
     </form>
@@ -314,8 +318,8 @@ function ExcelImportForm({ apartmentId, onDone }) {
         year: row.year,
         month: row.month,
         ...(row.rentAmount != null ? { rentAmount: row.rentAmount } : {}),
-        electricity: row.electricity,
-        water: row.water,
+        ...(row.electricity ? { electricity: row.electricity } : {}),
+        ...(row.water ? { water: row.water } : {}),
       }));
     if (!rows?.length) {
       setError('אין בקובץ חודשים תקינים שניתן לייבא');
@@ -355,7 +359,7 @@ function ExcelImportForm({ apartmentId, onDone }) {
           <TextInput dir="ltr" type="number" min="2000" max="2100" value={defaultYear} onChange={(event) => setDefaultYear(event.target.value)} required />
         </Field>
         <div className="sm:col-span-2 text-sm text-slate-600">
-          הקובץ צריך לכלול חודש, שכר דירה וקריאות קודמות ונוכחיות לחשמל ולמים. תעריפים יכולים להופיע בקובץ או להילקח מהגדרות המערכת.
+          בכל שורה חובה לציין חודש ולפחות נתון אחד: שכר דירה, קריאת חשמל או קריאת מים. אין חובה להזין את כל הסוגים בכל חודש. תעריפים יכולים להופיע בקובץ או להילקח מהגדרות המערכת.
         </div>
         <div className="sm:col-span-2"><Button disabled={loading}>{loading ? 'בודק את הקובץ...' : 'בדיקה ותצוגה מקדימה'}</Button></div>
       </form>
@@ -709,17 +713,17 @@ export default function ApartmentPage() {
                     <tr key={`table-${month.year}-${month.month}`} className="border-t border-slate-100">
                       <td className="whitespace-nowrap p-3 font-medium">{monthLabel(month.year, month.month)}</td>
                       <td className="p-3 font-medium">{formatMoney(month.openingBalance)}</td>
-                      <td className="p-3">{formatMoney(month.rent?.amountDue)}</td>
+                      <td className="p-3">{month.rent ? formatMoney(month.rent.amountDue) : '—'}</td>
                       <td className="p-3">{formatQty(month.electricity?.previousReading)}</td>
                       <td className="p-3">{formatQty(month.electricity?.currentReading)}</td>
                       <td className="p-3">{formatQty(month.electricity?.consumption)}</td>
-                      <td className="p-3">{formatMoney(month.electricity?.tariffPrice)}</td>
-                      <td className="p-3">{formatMoney(month.electricity?.amountDue)}</td>
+                      <td className="p-3">{month.electricity ? formatMoney(month.electricity.tariffPrice) : '—'}</td>
+                      <td className="p-3">{month.electricity ? formatMoney(month.electricity.amountDue) : '—'}</td>
                       <td className="p-3">{formatQty(month.water?.previousReading)}</td>
                       <td className="p-3">{formatQty(month.water?.currentReading)}</td>
                       <td className="p-3">{formatQty(month.water?.consumption)}</td>
-                      <td className="p-3">{formatMoney(month.water?.tariffPrice)}</td>
-                      <td className="p-3">{formatMoney(month.water?.amountDue)}</td>
+                      <td className="p-3">{month.water ? formatMoney(month.water.tariffPrice) : '—'}</td>
+                      <td className="p-3">{month.water ? formatMoney(month.water.amountDue) : '—'}</td>
                       <td className="p-3 font-medium">{formatMoney(month.totalDue)}</td>
                       <td className="p-3">{formatMoney(month.totalPaid)}</td>
                       <td className="p-3 font-medium">{formatMoney(month.remaining)}</td>

@@ -267,6 +267,26 @@ importSheet.addRow([
   150.74,
   8.5,
 ]);
+importSheet.addRow([
+  `יוני ${testYear}`,
+  3300,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+]);
+importSheet.addRow([
+  `יולי ${testYear}`,
+  null,
+  1520,
+  1600,
+  0.8,
+  null,
+  null,
+  null,
+]);
 const importBuffer = await importWorkbook.xlsx.writeBuffer();
 const importForm = new FormData();
 importForm.append('file', new Blob([importBuffer]), 'apartment-import.xlsx');
@@ -278,7 +298,7 @@ const importPreviewResponse = await fetch(`${base}/apartments/${apartment.id}/im
 });
 const importPreview = await importPreviewResponse.json();
 assert(importPreviewResponse.ok, `import preview ${importPreview.error || ''}`);
-assert(importPreview.importableCount === 1, 'one importable Excel row');
+assert(importPreview.importableCount === 3, 'three importable Excel rows');
 const importResult = await request(`/apartments/${apartment.id}/import/commit`, {
   method: 'POST',
   ...auth,
@@ -287,15 +307,21 @@ const importResult = await request(`/apartments/${apartment.id}/import/commit`, 
       year: row.year,
       month: row.month,
       rentAmount: row.rentAmount,
-      electricity: row.electricity,
-      water: row.water,
+      ...(row.electricity ? { electricity: row.electricity } : {}),
+      ...(row.water ? { water: row.water } : {}),
     })),
   },
 });
-assert(importResult.imported === 1, 'Excel month imported');
+assert(importResult.imported === 3, 'Excel months imported');
 const importedMay = importResult.months.find((month) => month.month === 5);
 assert(importedMay.electricity.amountDue === '75.00', 'imported electricity calculated');
 assert(importedMay.water.amountDue === '85.00', 'imported water calculated');
+const importedJune = importResult.months.find((month) => month.month === 6);
+assert(importedJune.rent.amountDue === '3300.00', 'rent-only Excel month imported');
+assert(importedJune.electricity === null && importedJune.water === null, 'rent-only month has no meters');
+const importedJuly = importResult.months.find((month) => month.month === 7);
+assert(importedJuly.rent === null && importedJuly.water === null, 'electricity-only month has no unrelated charges');
+assert(importedJuly.electricity.amountDue === '64.00', 'electricity-only Excel month imported');
 
 const pdf = await fetch(`${base}/receipts/${partial.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
 const bytes = Buffer.from(await pdf.arrayBuffer());

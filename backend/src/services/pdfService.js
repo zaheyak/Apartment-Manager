@@ -249,32 +249,37 @@ export function renderMonthChargePdf(apartment, month) {
     { label: 'סוג חיוב', width: 81, align: 'right' },
   ];
   y = drawTableHeader(doc, y, columns);
-  const chargeRows = [
-    [
+  const chargeRows = [];
+  if (month.rent) {
+    chargeRows.push([
       formatMoney(month.rent?.amountDue),
       '—',
       '—',
       '—',
       '—',
       'שכר דירה',
-    ],
-    [
+    ]);
+  }
+  if (month.electricity) {
+    chargeRows.push([
       formatMoney(month.electricity?.amountDue),
       formatMoney(month.electricity?.tariffPrice),
       formatQty(month.electricity?.consumption),
       formatQty(month.electricity?.currentReading),
       formatQty(month.electricity?.previousReading),
       'חשמל',
-    ],
-    [
+    ]);
+  }
+  if (month.water) {
+    chargeRows.push([
       formatMoney(month.water?.amountDue),
       formatMoney(month.water?.tariffPrice),
       formatQty(month.water?.consumption),
       formatQty(month.water?.currentReading),
       formatQty(month.water?.previousReading),
       'מים',
-    ],
-  ];
+    ]);
+  }
   for (const row of chargeRows) y = drawTableRow(doc, y, columns, row, { height: 44 });
   drawTotalBox(doc, y + 28, 'סך כל החיוב לחודש', formatMoney(month.totalDue));
   pdf.finish();
@@ -314,9 +319,9 @@ export function renderApartmentHistoryPdf(report) {
       formatMoney(month.remaining),
       formatMoney(month.totalPaid),
       formatMoney(month.totalDue),
-      formatMoney(month.water?.amountDue),
-      formatMoney(month.electricity?.amountDue),
-      formatMoney(month.rent?.amountDue),
+      month.water ? formatMoney(month.water.amountDue) : '—',
+      month.electricity ? formatMoney(month.electricity.amountDue) : '—',
+      month.rent ? formatMoney(month.rent.amountDue) : '—',
       pdfMonthLabel(month.year, month.month),
     ], { height: 34 });
   }

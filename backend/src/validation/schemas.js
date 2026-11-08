@@ -74,8 +74,20 @@ export const monthSchema = z.object({
   water: readingSchema,
 });
 
+const excelImportRowSchema = z
+  .object({
+    year: z.number().int().min(2000).max(2100),
+    month: z.number().int().min(1).max(12),
+    rentAmount: z.number().nonnegative().optional(),
+    electricity: readingSchema.optional(),
+    water: readingSchema.optional(),
+  })
+  .refine((row) => row.rentAmount != null || row.electricity || row.water, {
+    message: 'כל שורה חייבת להכיל לפחות שכר דירה או קריאת מונה אחת',
+  });
+
 export const excelImportSchema = z.object({
-  rows: z.array(monthSchema).min(1, 'לא נבחרו חודשים לייבוא').max(240, 'ניתן לייבא עד 240 חודשים בכל פעם'),
+  rows: z.array(excelImportRowSchema).min(1, 'לא נבחרו חודשים לייבוא').max(240, 'ניתן לייבא עד 240 חודשים בכל פעם'),
 });
 
 export const monthUpdateSchema = z
