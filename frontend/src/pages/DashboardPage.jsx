@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { Alert, Card, Stat } from '../components/ui.jsx';
-import { CATEGORY_LABELS, METHOD_LABELS, formatDate, formatMoney, monthLabel } from '../format.js';
+import { METHOD_LABELS, formatDate, formatMoney, monthLabel } from '../format.js';
 
 function UnpaidList({ title, rows }) {
   return (
@@ -45,10 +45,8 @@ export default function DashboardPage() {
         <Stat label="תשלומים שהתקבלו" value={formatMoney(data.totals.paymentsReceived)} />
         <Stat label="יתרות פתוחות" value={formatMoney(data.totals.outstanding)} />
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <UnpaidList title="שכר דירה שלא שולם" rows={data.unpaidRent} />
-        <UnpaidList title="חשמל שלא שולם" rows={data.unpaidElectricity} />
-        <UnpaidList title="מים שלא שולמו" rows={data.unpaidWater} />
+      <div>
+        <UnpaidList title="דירות עם יתרה פתוחה" rows={data.unpaid} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="תשלומים אחרונים">
@@ -61,7 +59,7 @@ export default function DashboardPage() {
                   <span>{formatMoney(payment.amount)}</span>
                 </div>
                 <div className="mt-1 text-sm text-slate-500">
-                  {formatDate(payment.paymentDate)} · {monthLabel(payment.billingYear, payment.billingMonth)} · {CATEGORY_LABELS[payment.category]} · {METHOD_LABELS[payment.method]}
+                  {formatDate(payment.paymentDate)} · {monthLabel(payment.billingYear, payment.billingMonth)} · {METHOD_LABELS[payment.method]}
                 </div>
               </Link>
             ))}

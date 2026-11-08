@@ -14,7 +14,6 @@ import {
   TextInput,
 } from '../components/ui.jsx';
 import {
-  CATEGORY_LABELS,
   METHOD_LABELS,
   MONTHS,
   STATUS_LABELS,
@@ -43,7 +42,7 @@ function ChargeBlock({ title, charge, unit }) {
   if (!charge) return null;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div className="mb-3 flex items-center justify-between"><strong className="text-base">{title}</strong><Badge status={charge.status} /></div>
+      <div className="mb-3"><strong className="text-base">{title}</strong></div>
       {charge.previousReading != null && (
         <div className="mb-3 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4 dark:text-slate-300">
           <span>קודם: {formatQty(charge.previousReading)}</span>
@@ -53,18 +52,7 @@ function ChargeBlock({ title, charge, unit }) {
         </div>
       )}
       {charge.consumption != null && <div className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-200">{formatQty(charge.consumption)} × {formatMoney(charge.tariffPrice)} = {formatMoney(charge.amountDue)}</div>}
-      <div className="grid grid-cols-1 gap-2 font-semibold sm:grid-cols-3"><span>חיוב {formatMoney(charge.amountDue)}</span><span>שולם {formatMoney(charge.amountPaid)}</span><span>יתרה {formatMoney(charge.remaining)}</span></div>
-      {charge.paymentDetails?.length > 0 && (
-        <div className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
-          {charge.paymentDetails.map((payment) => (
-            <div key={`${payment.paymentId}-${payment.amount}`} className="flex flex-wrap justify-between gap-2">
-              <span>{formatDate(payment.paymentDate)} · {METHOD_LABELS[payment.method]}</span>
-              <strong>{formatMoney(payment.amount)}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-      {charge.paidThroughDate && <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">שולם עד {formatDate(charge.paidThroughDate)}</div>}
+      <div className="rounded-xl bg-slate-50 p-3 font-bold dark:bg-slate-800">חיוב: {formatMoney(charge.amountDue)}</div>
     </div>
   );
 }
@@ -231,7 +219,6 @@ function PaymentForm({ apartmentId, months, onDone }) {
     paymentDate: today,
     amount: '',
     method: 'bank_transfer',
-    category: 'multiple',
     applyToOldest: true,
     billingKey: latestMonth ? `${latestMonth.year}-${latestMonth.month}` : '',
     notes: '',
@@ -249,6 +236,7 @@ function PaymentForm({ apartmentId, months, onDone }) {
         method: 'POST',
         body: JSON.stringify({
           ...form,
+          category: 'multiple',
           amount: Number(form.amount),
           billingYear,
           billingMonth,
@@ -272,11 +260,6 @@ function PaymentForm({ apartmentId, months, onDone }) {
       <Field label="אמצעי תשלום">
         <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
           {Object.entries(METHOD_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </Select>
-      </Field>
-      <Field label="קטגוריה">
-        <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-          {Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </Select>
       </Field>
       <Field label={form.applyToOldest ? 'סגירת חוב מצטבר עד חודש' : 'חודש חיוב'}>
@@ -350,7 +333,6 @@ export default function ApartmentPage() {
   const [modal, setModal] = useState(null);
   const [error, setError] = useState('');
   const [year, setYear] = useState('all');
-  const [status, setStatus] = useState('all');
   const [detailMonthKey, setDetailMonthKey] = useState('');
 
   const load = useCallback(async () => {
@@ -379,7 +361,7 @@ export default function ApartmentPage() {
   useEffect(() => { load(); }, [load]);
 
   const years = useMemo(() => [...new Set(months.map((month) => month.year))].sort((a, b) => b - a), [months]);
-  const filteredMonths = useMemo(() => months.filter((month) => (year === 'all' || month.year === Number(year)) && (status === 'all' || month.status === status)).reverse(), [months, year, status]);
+  const filteredMonths = useMemo(() => months.filter((month) => year === 'all' || month.year === Number(year)).reverse(), [months, year]);
   const detailMonth = useMemo(
     () => months.find((month) => `${month.year}-${month.month}` === detailMonthKey)
       || months.at(-1),
@@ -443,7 +425,6 @@ export default function ApartmentPage() {
             <Card
               className="lg:col-span-2"
               title={`חשבון חודשי · ${monthLabel(detailMonth.year, detailMonth.month)}`}
-              action={<Badge status={detailMonth.status} />}
             >
               <div className="mb-5 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:bg-[#0b1020]">
                 <Button
@@ -532,7 +513,6 @@ export default function ApartmentPage() {
           <Card>
             <div className="mb-4 flex flex-wrap gap-3">
               <Select className="max-w-48" value={year} onChange={(e) => setYear(e.target.value)}><option value="all">כל השנים</option>{years.map((value) => <option key={value} value={value}>{value}</option>)}</Select>
-              <Select className="max-w-48" value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">כל הסטטוסים</option><option value="unpaid">לא שולם</option><option value="partial">שולם חלקית</option><option value="paid">שולם</option></Select>
             </div>
             <div className="space-y-4">
               {filteredMonths.map((month) => (
@@ -545,7 +525,6 @@ export default function ApartmentPage() {
                         <h3 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{monthLabel(month.year, month.month)}</h3>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge status={month.status} />
                         <Button variant="secondary" onClick={() => setModal({ type: 'editMonth', record: month })}>עריכת החודש</Button>
                         <Button onClick={() => downloadFile(`/api/apartments/${id}/months/${month.year}/${month.month}/summary.pdf`, `monthly-charge-${month.year}-${month.month}.pdf`)}>הורדת PDF לחודש</Button>
                       </div>
@@ -578,10 +557,10 @@ export default function ApartmentPage() {
               <p className="mt-1 text-sm text-slate-500">ניתן לגלול לצדדים כדי לראות את כל נתוני החיובים, הקריאות והתשלומים.</p>
             </div>
             <div className="overflow-auto rounded-xl border border-slate-200">
-              <table className="min-w-[2600px] text-right text-xs">
+              <table className="min-w-[1700px] text-right text-xs">
                 <thead className="sticky top-0 bg-slate-100 text-slate-600">
                   <tr>
-                    {['חודש', 'יתרת פתיחה', 'שכר דירה', 'שולם שכ״ד', 'אופן תשלום שכ״ד', 'סטטוס שכ״ד', 'שכ״ד שולם עד', 'חשמל קודם', 'חשמל נוכחי', 'צריכת חשמל', 'מחיר חשמל להכפלה', 'חיוב חשמל', 'שולם חשמל', 'אופן תשלום חשמל', 'סטטוס חשמל', 'חשמל שולם עד', 'מים קודם', 'מים נוכחי', 'צריכת מים', 'מחיר מים להכפלה', 'חיוב מים', 'שולם מים', 'אופן תשלום מים', 'סטטוס מים', 'מים שולם עד', 'סך חיובים', 'סך ששולם', 'יתרת חודש', 'יתרה מצטברת'].map((heading) => <th key={heading} className="whitespace-nowrap p-3">{heading}</th>)}
+                    {['חודש', 'יתרת פתיחה', 'שכר דירה', 'קריאת חשמל קודמת', 'קריאת חשמל נוכחית', 'צריכת חשמל', 'מחיר חשמל להכפלה', 'חיוב חשמל', 'קריאת מים קודמת', 'קריאת מים נוכחית', 'צריכת מים', 'מחיר מים להכפלה', 'חיוב מים', 'סך חיובים', 'סך ששולם', 'יתרת חודש', 'יתרה מצטברת'].map((heading) => <th key={heading} className="whitespace-nowrap p-3">{heading}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -590,28 +569,16 @@ export default function ApartmentPage() {
                       <td className="whitespace-nowrap p-3 font-medium">{monthLabel(month.year, month.month)}</td>
                       <td className="p-3 font-medium">{formatMoney(month.openingBalance)}</td>
                       <td className="p-3">{formatMoney(month.rent?.amountDue)}</td>
-                      <td className="p-3">{formatMoney(month.rent?.amountPaid)}</td>
-                      <td className="p-3">{month.rent?.paymentDetails?.map((payment) => METHOD_LABELS[payment.method]).join(', ') || '—'}</td>
-                      <td className="p-3">{STATUS_LABELS[month.rent?.status]}</td>
-                      <td className="p-3">{formatDate(month.rent?.paidThroughDate)}</td>
                       <td className="p-3">{formatQty(month.electricity?.previousReading)}</td>
                       <td className="p-3">{formatQty(month.electricity?.currentReading)}</td>
                       <td className="p-3">{formatQty(month.electricity?.consumption)}</td>
                       <td className="p-3">{formatMoney(month.electricity?.tariffPrice)}</td>
                       <td className="p-3">{formatMoney(month.electricity?.amountDue)}</td>
-                      <td className="p-3">{formatMoney(month.electricity?.amountPaid)}</td>
-                      <td className="p-3">{month.electricity?.paymentDetails?.map((payment) => METHOD_LABELS[payment.method]).join(', ') || '—'}</td>
-                      <td className="p-3">{STATUS_LABELS[month.electricity?.status]}</td>
-                      <td className="p-3">{formatDate(month.electricity?.paidThroughDate)}</td>
                       <td className="p-3">{formatQty(month.water?.previousReading)}</td>
                       <td className="p-3">{formatQty(month.water?.currentReading)}</td>
                       <td className="p-3">{formatQty(month.water?.consumption)}</td>
                       <td className="p-3">{formatMoney(month.water?.tariffPrice)}</td>
                       <td className="p-3">{formatMoney(month.water?.amountDue)}</td>
-                      <td className="p-3">{formatMoney(month.water?.amountPaid)}</td>
-                      <td className="p-3">{month.water?.paymentDetails?.map((payment) => METHOD_LABELS[payment.method]).join(', ') || '—'}</td>
-                      <td className="p-3">{STATUS_LABELS[month.water?.status]}</td>
-                      <td className="p-3">{formatDate(month.water?.paidThroughDate)}</td>
                       <td className="p-3 font-medium">{formatMoney(month.totalDue)}</td>
                       <td className="p-3">{formatMoney(month.totalPaid)}</td>
                       <td className="p-3 font-medium">{formatMoney(month.remaining)}</td>
@@ -629,8 +596,8 @@ export default function ApartmentPage() {
         <Card title="כל התשלומים" action={<Button onClick={() => setModal({ type: 'payment' })}>רישום תשלום</Button>}>
           <div className="overflow-auto">
             <table className="w-full min-w-[700px] text-right text-sm">
-              <thead className="border-b text-slate-500"><tr><th className="p-3">תאריך</th><th className="p-3">חודש</th><th className="p-3">סכום</th><th className="p-3">אמצעי</th><th className="p-3">קטגוריה</th><th className="p-3">אסמכתא</th><th className="p-3">מסמך</th></tr></thead>
-              <tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-slate-100"><td className="p-3">{formatDate(payment.paymentDate)}</td><td className="p-3">{payment.applyToOldest ? `חוב מצטבר עד ${monthLabel(payment.billingYear, payment.billingMonth)}` : monthLabel(payment.billingYear, payment.billingMonth)}</td><td className="p-3 font-medium">{formatMoney(payment.amount)}</td><td className="p-3">{METHOD_LABELS[payment.method]}</td><td className="p-3">{CATEGORY_LABELS[payment.category]}</td><td className="p-3">{payment.referenceNumber || '—'}</td><td className="p-3">{payment.receiptId && <Button variant="ghost" onClick={() => downloadFile(`/api/receipts/${payment.receiptId}/pdf`, `${payment.receiptNumber}.pdf`)}>אישור תשלום PDF</Button>}</td></tr>)}</tbody>
+              <thead className="border-b text-slate-500"><tr><th className="p-3">תאריך</th><th className="p-3">חודש</th><th className="p-3">סכום</th><th className="p-3">אמצעי</th><th className="p-3">אסמכתא</th><th className="p-3">מסמך</th></tr></thead>
+              <tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-slate-100"><td className="p-3">{formatDate(payment.paymentDate)}</td><td className="p-3">{payment.applyToOldest ? `חוב מצטבר עד ${monthLabel(payment.billingYear, payment.billingMonth)}` : monthLabel(payment.billingYear, payment.billingMonth)}</td><td className="p-3 font-medium">{formatMoney(payment.amount)}</td><td className="p-3">{METHOD_LABELS[payment.method]}</td><td className="p-3">{payment.referenceNumber || '—'}</td><td className="p-3">{payment.receiptId && <Button variant="ghost" onClick={() => downloadFile(`/api/receipts/${payment.receiptId}/pdf`, `${payment.receiptNumber}.pdf`)}>אישור תשלום PDF</Button>}</td></tr>)}</tbody>
             </table>
           </div>
           {payments.length === 0 && <p className="mt-4 text-sm text-slate-500">עדיין לא נרשמו תשלומים.</p>}

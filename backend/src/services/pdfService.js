@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import {
-  CATEGORY_LABELS,
   METHOD_LABELS,
   MONTHS_HE,
   formatDate,
@@ -170,7 +169,6 @@ export function renderReceiptPdf(snapshot) {
     ['תאריך התשלום', formatDate(snapshot.paymentDate)],
     ['סכום ששולם', formatMoney(snapshot.paidNow)],
     ['אמצעי תשלום', METHOD_LABELS[snapshot.method] || snapshot.method],
-    ['עבור', CATEGORY_LABELS[snapshot.category] || snapshot.category],
     ...(snapshot.referenceNumber ? [['אסמכתא', snapshot.referenceNumber]] : []),
   ];
   for (const [label, value] of rows) {

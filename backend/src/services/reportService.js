@@ -47,6 +47,7 @@ export async function dashboard() {
     unpaidRent: open('rentOutstanding'),
     unpaidElectricity: open('electricityOutstanding'),
     unpaidWater: open('waterOutstanding'),
+    unpaid: open('outstanding'),
     recentPayments: recentPayments.rows.map((row) => ({
       id: row.id,
       apartmentId: row.apartment_id,
