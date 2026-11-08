@@ -349,6 +349,28 @@ const afterSkippedReading = await request(`/apartments/${apartment.id}/months`, 
 const september = afterSkippedReading.find((month) => month.month === 9);
 assert(september.electricity.previousReading === '1600.000', 'electricity reading carried across blank month');
 assert(september.water.previousReading === '150.740', 'water reading carried across blank months');
+await request(`/apartments/${apartment.id}/months`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    year: testYear,
+    month: 10,
+    rentAmount: 3300,
+    electricity: { current: 1800, tariffPrice: 0.8 },
+    water: { current: 170.74, tariffPrice: 8.5 },
+  },
+});
+const afterClearedReading = await request(`/apartments/${apartment.id}/months/${testYear}/9`, {
+  method: 'PATCH',
+  ...auth,
+  body: { water: { remove: true } },
+});
+const septemberAfterClear = afterClearedReading.find((month) => month.month === 9);
+const octoberAfterCarry = afterClearedReading.find((month) => month.month === 10);
+assert(septemberAfterClear.water === null, 'cleared current reading removes monthly water charge');
+assert(octoberAfterCarry.water.previousReading === '150.740', 'cleared reading carries previous to next month');
+assert(octoberAfterCarry.water.consumption === '20.000', 'next consumption recalculated after cleared reading');
+assert(octoberAfterCarry.water.amountDue === '170.00', 'next charge recalculated after cleared reading');
 
 const pdf = await fetch(`${base}/receipts/${partial.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
 const bytes = Buffer.from(await pdf.arrayBuffer());

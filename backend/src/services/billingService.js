@@ -298,8 +298,72 @@ async function allocatedCents(client, chargeId) {
   return toCents(rows[0].paid);
 }
 
+async function removeUtilityCharge(client, charge) {
+  const paid = await allocatedCents(client, charge.id);
+  if (paid > 0) {
+    throw new AppError(400, 'לא ניתן למחוק קריאה שכבר הוקצה אליה תשלום');
+  }
+  const carriedReading = Number(charge.previous_reading);
+  const { rows } = await client.query(
+    `SELECT *
+     FROM monthly_charges
+     WHERE apartment_id = $1
+       AND category = $2
+       AND (charge_year > $3 OR (charge_year = $3 AND charge_month > $4))
+     ORDER BY charge_year, charge_month
+     LIMIT 1
+     FOR UPDATE`,
+    [charge.apartment_id, charge.category, charge.charge_year, charge.charge_month],
+  );
+  const next = rows[0];
+  let updatedNext = null;
+  if (next) {
+    const current = Number(next.current_reading);
+    if (current < carriedReading) {
+      throw new AppError(400, 'לא ניתן למחוק את הקריאה משום שהקריאה הבאה נמוכה מהקריאה שתועבר');
+    }
+    const consumption = roundQty(current - carriedReading);
+    const amount = chargeAmount(consumption, Number(next.tariff_price));
+    const nextPaid = await allocatedCents(client, next.id);
+    if (toCents(amount) < nextPaid) {
+      throw new AppError(400, 'לא ניתן למחוק את הקריאה משום שהחיוב הבא כבר שולם בסכום גבוה יותר');
+    }
+    await client.query(
+      `UPDATE meter_readings
+       SET previous_value = $1::numeric(14,3),
+           consumption = current_value - $1::numeric(14,3)
+       WHERE id = $2`,
+      [carriedReading, next.meter_reading_id],
+    );
+    await client.query(
+      `UPDATE monthly_charges
+       SET previous_reading = $1::numeric(14,3),
+           consumption = current_reading - $1::numeric(14,3),
+           amount_due = $2,
+           updated_at = now()
+       WHERE id = $3`,
+      [carriedReading, amount, next.id],
+    );
+    updatedNext = {
+      year: next.charge_year,
+      month: next.charge_month,
+      previous: carriedReading,
+      current,
+      consumption,
+      amount,
+    };
+  }
+  await client.query('DELETE FROM monthly_charges WHERE id = $1', [charge.id]);
+  if (charge.meter_reading_id) {
+    await client.query('DELETE FROM meter_readings WHERE id = $1', [charge.meter_reading_id]);
+  }
+  return { removed: true, carriedReading, updatedNext };
+}
+
 async function updateUtilityCharge(client, charge, readingInput) {
   if (!readingInput) return null;
+  if (!charge) throw new AppError(404, 'קריאת המונה לחודש זה אינה קיימת');
+  if (readingInput.remove) return removeUtilityCharge(client, charge);
   const previous = readingInput.previous ?? Number(charge.previous_reading);
   const current = readingInput.current ?? Number(charge.current_reading);
   const tariffPrice = readingInput.tariffPrice ?? Number(charge.tariff_price);

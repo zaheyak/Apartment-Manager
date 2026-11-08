@@ -95,6 +95,7 @@ export const monthUpdateSchema = z
     rentAmount: z.number().nonnegative().optional(),
     electricity: z
       .object({
+        remove: z.boolean().optional(),
         current: z.number().nonnegative().optional(),
         previous: z.number().nonnegative().optional(),
         tariffPrice: z.number().nonnegative().optional(),
@@ -102,6 +103,7 @@ export const monthUpdateSchema = z
       .optional(),
     water: z
       .object({
+        remove: z.boolean().optional(),
         current: z.number().nonnegative().optional(),
         previous: z.number().nonnegative().optional(),
         tariffPrice: z.number().nonnegative().optional(),
