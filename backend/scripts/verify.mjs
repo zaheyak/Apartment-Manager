@@ -354,5 +354,31 @@ const xlsx = await fetch(`${base}/apartments/${apartment.id}/history.xlsx`, {
 const sheet = Buffer.from(await xlsx.arrayBuffer());
 assert(xlsx.ok && sheet.subarray(0, 2).toString() === 'PK', 'excel export');
 
+const balanceBeforeDeleteTest = importResult.months.at(-1).cumulativeRemaining;
+const paymentToDelete = await request(`/apartments/${apartment.id}/payments`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    paymentDate: `${testYear}-07-20`,
+    amount: 100,
+    method: 'cash',
+    category: 'multiple',
+    applyToOldest: true,
+    billingYear: testYear,
+    billingMonth: 7,
+    notes: 'תשלום למחיקה בבדיקה',
+  },
+});
+await request(`/apartments/${apartment.id}/payments/${paymentToDelete.paymentId}`, {
+  method: 'DELETE',
+  ...auth,
+});
+const afterDeletedPayment = await request(`/apartments/${apartment.id}/months?year=${testYear}`, auth);
+assert(afterDeletedPayment.at(-1).cumulativeRemaining === balanceBeforeDeleteTest, 'deleted payment restored cumulative balance');
+const paymentsAfterDelete = await request(`/apartments/${apartment.id}/payments`, auth);
+assert(!paymentsAfterDelete.some((payment) => payment.id === paymentToDelete.paymentId), 'payment deleted');
+const receiptsAfterDelete = await request(`/apartments/${apartment.id}/receipts`, auth);
+assert(!receiptsAfterDelete.some((receipt) => receipt.paymentId === paymentToDelete.paymentId), 'deleted payment receipt removed');
+
 console.log('Verification passed');
 console.log(`Apartment ${apartment.number}: January total ₪3,807.55, partial ₪2,000, then paid in full.`);

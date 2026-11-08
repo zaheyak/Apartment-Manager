@@ -36,7 +36,13 @@ import {
   readingPreview,
   updateMonth,
 } from '../services/billingService.js';
-import { getReceipt, listPayments, listReceipts, recordPayment } from '../services/paymentService.js';
+import {
+  deletePayment,
+  getReceipt,
+  listPayments,
+  listReceipts,
+  recordPayment,
+} from '../services/paymentService.js';
 import { apartmentReport, buildingReport, dashboard } from '../services/reportService.js';
 import { addTariff, getSettings, updateBuilding } from '../services/settingsService.js';
 import {
@@ -230,6 +236,10 @@ router.get('/apartments/:id/payments', asyncRoute(async (req, res) => {
 router.post('/apartments/:id/payments', asyncRoute(async (req, res) => {
   const receipt = await recordPayment(req.params.id, parseBody(paymentSchema, req.body), req.user.sub);
   res.status(201).json(receipt);
+}));
+
+router.delete('/apartments/:id/payments/:paymentId', asyncRoute(async (req, res) => {
+  res.json(await deletePayment(req.params.id, req.params.paymentId, req.user.sub));
 }));
 
 router.get('/apartments/:id/receipts', asyncRoute(async (req, res) => {

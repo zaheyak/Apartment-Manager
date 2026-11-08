@@ -533,6 +533,20 @@ export default function ApartmentPage() {
     } catch (err) { setError(err.message); }
   }
 
+  async function removePayment(payment) {
+    const approved = window.confirm(
+      `למחוק את התשלום בסך ${formatMoney(payment.amount)} מתאריך ${formatDate(payment.paymentDate)}?\n\nהסכום יחזור ליתרה המצטברת ואישור התשלום יימחק.`,
+    );
+    if (!approved) return;
+    setError('');
+    try {
+      await api(`/api/apartments/${id}/payments/${payment.id}`, { method: 'DELETE' });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div className="apartment-page -m-4 min-h-[calc(100vh-57px)] space-y-6 p-4 sm:-m-6 sm:p-6 lg:-m-8 lg:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -741,8 +755,20 @@ export default function ApartmentPage() {
         <Card title="כל התשלומים" action={<Button onClick={() => setModal({ type: 'payment' })}>רישום תשלום</Button>}>
           <div className="overflow-auto">
             <table className="w-full min-w-[700px] text-right text-sm">
-              <thead className="border-b text-slate-500"><tr><th className="p-3">תאריך</th><th className="p-3">חודש</th><th className="p-3">סכום</th><th className="p-3">אמצעי</th><th className="p-3">אסמכתא</th><th className="p-3">מסמך</th></tr></thead>
-              <tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-slate-100"><td className="p-3">{formatDate(payment.paymentDate)}</td><td className="p-3">{payment.applyToOldest ? `חוב מצטבר עד ${monthLabel(payment.billingYear, payment.billingMonth)}` : monthLabel(payment.billingYear, payment.billingMonth)}</td><td className="p-3 font-medium">{formatMoney(payment.amount)}</td><td className="p-3">{METHOD_LABELS[payment.method]}</td><td className="p-3">{payment.referenceNumber || '—'}</td><td className="p-3">{payment.receiptId && <Button variant="ghost" onClick={() => downloadFile(`/api/receipts/${payment.receiptId}/pdf`, `${payment.receiptNumber}.pdf`)}>אישור תשלום PDF</Button>}</td></tr>)}</tbody>
+              <thead className="border-b text-slate-500"><tr><th className="p-3">תאריך</th><th className="p-3">חודש</th><th className="p-3">סכום</th><th className="p-3">אמצעי</th><th className="p-3">אסמכתא</th><th className="p-3">מסמך</th><th className="p-3">פעולות</th></tr></thead>
+              <tbody>
+                {payments.map((payment) => (
+                  <tr key={payment.id} className="border-b border-slate-100">
+                    <td className="p-3">{formatDate(payment.paymentDate)}</td>
+                    <td className="p-3">{payment.applyToOldest ? `חוב מצטבר עד ${monthLabel(payment.billingYear, payment.billingMonth)}` : monthLabel(payment.billingYear, payment.billingMonth)}</td>
+                    <td className="p-3 font-medium">{formatMoney(payment.amount)}</td>
+                    <td className="p-3">{METHOD_LABELS[payment.method]}</td>
+                    <td className="p-3">{payment.referenceNumber || '—'}</td>
+                    <td className="p-3">{payment.receiptId && <Button variant="ghost" onClick={() => downloadFile(`/api/receipts/${payment.receiptId}/pdf`, `${payment.receiptNumber}.pdf`)}>אישור תשלום PDF</Button>}</td>
+                    <td className="p-3"><Button variant="danger" onClick={() => removePayment(payment)}>מחיקת תשלום</Button></td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
           {payments.length === 0 && <p className="mt-4 text-sm text-slate-500">עדיין לא נרשמו תשלומים.</p>}

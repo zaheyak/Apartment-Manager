@@ -60,6 +60,58 @@ export async function listReceipts(apartmentId) {
   }));
 }
 
+export async function deletePayment(apartmentId, paymentId, adminId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT p.*, r.id AS receipt_id, r.receipt_number, r.snapshot
+       FROM payments p
+       LEFT JOIN payment_receipts r ON r.payment_id = p.id
+       WHERE p.id = $1 AND p.apartment_id = $2
+       FOR UPDATE OF p`,
+      [paymentId, apartmentId],
+    );
+    const payment = rows[0];
+    if (!payment) throw new AppError(404, 'התשלום לא נמצא');
+
+    if (payment.receipt_id) {
+      await client.query('DELETE FROM documents WHERE receipt_id = $1', [payment.receipt_id]);
+      await client.query('DELETE FROM payment_receipts WHERE id = $1', [payment.receipt_id]);
+    }
+    await client.query('DELETE FROM payment_allocations WHERE payment_id = $1', [paymentId]);
+    await client.query('DELETE FROM payments WHERE id = $1', [paymentId]);
+    await client.query(
+      `INSERT INTO audit_logs (
+        admin_id, apartment_id, entity_type, entity_id, action, before_data
+      ) VALUES ($1, $2, 'payment', $3, 'delete_payment', $4)`,
+      [
+        adminId,
+        apartmentId,
+        paymentId,
+        {
+          paymentDate: payment.payment_date,
+          amount: money(payment.amount),
+          method: payment.method,
+          billingYear: payment.billing_year,
+          billingMonth: payment.billing_month,
+          notes: payment.notes,
+          referenceNumber: payment.reference_number,
+          receiptNumber: payment.receipt_number,
+          snapshot: payment.snapshot,
+        },
+      ],
+    );
+    await client.query('COMMIT');
+    return { ok: true };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function getReceipt(id) {
   const { rows } = await pool.query(
     `SELECT id, receipt_number, payment_id, apartment_id, snapshot, created_at
