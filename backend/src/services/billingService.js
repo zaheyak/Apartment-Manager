@@ -121,65 +121,74 @@ async function insertUtility(client, { apartmentId, year, month, category, readi
   );
 }
 
+async function createMonthInTransaction(client, apartmentId, input, adminId, { skipExisting = false } = {}) {
+  const existing = await client.query(
+    `SELECT 1 FROM monthly_charges WHERE apartment_id = $1 AND charge_year = $2 AND charge_month = $3 LIMIT 1`,
+    [apartmentId, input.year, input.month],
+  );
+  if (existing.rows[0]) {
+    if (skipExisting) return false;
+    throw new AppError(409, 'כבר קיים חיוב לחודש זה');
+  }
+
+  const lease = await activeLease(client, apartmentId);
+  const rentAmount = input.rentAmount ?? (lease ? Number(lease.monthly_rent) : 0);
+  const electricityTariff = input.electricity.tariffPrice
+    ?? await tariffFor(client, 'electricity', input.year, input.month);
+  const waterTariff = input.water.tariffPrice
+    ?? await tariffFor(client, 'water', input.year, input.month);
+  const electricity = resolveReading(
+    'חשמל',
+    input.electricity,
+    await previousReading(client, apartmentId, 'electricity', input.year, input.month),
+  );
+  const water = resolveReading(
+    'מים',
+    input.water,
+    await previousReading(client, apartmentId, 'water', input.year, input.month),
+  );
+
+  await client.query(
+    `INSERT INTO monthly_charges (apartment_id, lease_id, charge_year, charge_month, category, amount_due)
+     VALUES ($1, $2, $3, $4, 'rent', $5)`,
+    [apartmentId, lease?.id ?? null, input.year, input.month, rentAmount],
+  );
+  await insertUtility(client, {
+    apartmentId,
+    year: input.year,
+    month: input.month,
+    category: 'electricity',
+    reading: electricity,
+    tariff: electricityTariff,
+  });
+  await insertUtility(client, {
+    apartmentId,
+    year: input.year,
+    month: input.month,
+    category: 'water',
+    reading: water,
+    tariff: waterTariff,
+  });
+  await audit(client, adminId, apartmentId, 'create_month', null, {
+    year: input.year,
+    month: input.month,
+    rentAmount,
+    electricity,
+    water,
+    electricityTariff,
+    waterTariff,
+    source: input.source || 'manual',
+  });
+  return true;
+}
+
 export async function createMonth(apartmentId, input, adminId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const apartment = await client.query('SELECT id FROM apartments WHERE id = $1 FOR UPDATE', [apartmentId]);
     if (!apartment.rows[0]) throw new AppError(404, 'הדירה לא נמצאה');
-    const existing = await client.query(
-      `SELECT 1 FROM monthly_charges WHERE apartment_id = $1 AND charge_year = $2 AND charge_month = $3 LIMIT 1`,
-      [apartmentId, input.year, input.month],
-    );
-    if (existing.rows[0]) throw new AppError(409, 'כבר קיים חיוב לחודש זה');
-
-    const lease = await activeLease(client, apartmentId);
-    const rentAmount = input.rentAmount ?? (lease ? Number(lease.monthly_rent) : 0);
-    const electricityTariff = input.electricity.tariffPrice
-      ?? await tariffFor(client, 'electricity', input.year, input.month);
-    const waterTariff = input.water.tariffPrice
-      ?? await tariffFor(client, 'water', input.year, input.month);
-    const electricity = resolveReading(
-      'חשמל',
-      input.electricity,
-      await previousReading(client, apartmentId, 'electricity', input.year, input.month),
-    );
-    const water = resolveReading(
-      'מים',
-      input.water,
-      await previousReading(client, apartmentId, 'water', input.year, input.month),
-    );
-
-    await client.query(
-      `INSERT INTO monthly_charges (apartment_id, lease_id, charge_year, charge_month, category, amount_due)
-       VALUES ($1, $2, $3, $4, 'rent', $5)`,
-      [apartmentId, lease?.id ?? null, input.year, input.month, rentAmount],
-    );
-    await insertUtility(client, {
-      apartmentId,
-      year: input.year,
-      month: input.month,
-      category: 'electricity',
-      reading: electricity,
-      tariff: electricityTariff,
-    });
-    await insertUtility(client, {
-      apartmentId,
-      year: input.year,
-      month: input.month,
-      category: 'water',
-      reading: water,
-      tariff: waterTariff,
-    });
-    await audit(client, adminId, apartmentId, 'create_month', null, {
-      year: input.year,
-      month: input.month,
-      rentAmount,
-      electricity,
-      water,
-      electricityTariff,
-      waterTariff,
-    });
+    await createMonthInTransaction(client, apartmentId, input, adminId);
     await client.query('COMMIT');
     return getMonths(apartmentId);
   } catch (error) {
@@ -188,6 +197,40 @@ export async function createMonth(apartmentId, input, adminId) {
   } finally {
     client.release();
   }
+}
+
+export async function importMonths(apartmentId, rows, adminId) {
+  const client = await pool.connect();
+  let imported = 0;
+  let skipped = 0;
+  try {
+    await client.query('BEGIN');
+    const apartment = await client.query('SELECT id FROM apartments WHERE id = $1 FOR UPDATE', [apartmentId]);
+    if (!apartment.rows[0]) throw new AppError(404, 'הדירה לא נמצאה');
+    const ordered = [...rows].sort((a, b) => (a.year * 12 + a.month) - (b.year * 12 + b.month));
+    for (const row of ordered) {
+      const created = await createMonthInTransaction(
+        client,
+        apartmentId,
+        { ...row, source: 'excel_import' },
+        adminId,
+        { skipExisting: true },
+      );
+      if (created) imported += 1;
+      else skipped += 1;
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return {
+    imported,
+    skipped,
+    months: await getMonths(apartmentId),
+  };
 }
 
 async function allocatedCents(client, chargeId) {

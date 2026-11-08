@@ -74,6 +74,10 @@ export const monthSchema = z.object({
   water: readingSchema,
 });
 
+export const excelImportSchema = z.object({
+  rows: z.array(monthSchema).min(1, 'לא נבחרו חודשים לייבוא').max(240, 'ניתן לייבא עד 240 חודשים בכל פעם'),
+});
+
 export const monthUpdateSchema = z
   .object({
     rentAmount: z.number().nonnegative().optional(),

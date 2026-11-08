@@ -276,6 +276,146 @@ function PaymentForm({ apartmentId, months, onDone }) {
   );
 }
 
+function ExcelImportForm({ apartmentId, onDone }) {
+  const [file, setFile] = useState(null);
+  const [defaultYear, setDefaultYear] = useState(now.getFullYear());
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function createPreview(event) {
+    event.preventDefault();
+    if (!file) {
+      setError('יש לבחור קובץ Excel מסוג XLSX');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('defaultYear', String(defaultYear));
+      setPreview(await api(`/api/apartments/${apartmentId}/import/preview`, {
+        method: 'POST',
+        body,
+      }));
+    } catch (err) {
+      setPreview(null);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmImport() {
+    const rows = preview?.rows
+      .filter((row) => row.canImport)
+      .map((row) => ({
+        year: row.year,
+        month: row.month,
+        ...(row.rentAmount != null ? { rentAmount: row.rentAmount } : {}),
+        electricity: row.electricity,
+        water: row.water,
+      }));
+    if (!rows?.length) {
+      setError('אין בקובץ חודשים תקינים שניתן לייבא');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await api(`/api/apartments/${apartmentId}/import/commit`, {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+      });
+      onDone();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Alert>{error}</Alert>
+      <form className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2" onSubmit={createPreview}>
+        <Field label="קובץ Excel">
+          <TextInput
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] || null);
+              setPreview(null);
+            }}
+            required
+          />
+        </Field>
+        <Field label="שנת ברירת מחדל">
+          <TextInput dir="ltr" type="number" min="2000" max="2100" value={defaultYear} onChange={(event) => setDefaultYear(event.target.value)} required />
+        </Field>
+        <div className="sm:col-span-2 text-sm text-slate-600">
+          הקובץ צריך לכלול חודש, שכר דירה וקריאות קודמות ונוכחיות לחשמל ולמים. תעריפים יכולים להופיע בקובץ או להילקח מהגדרות המערכת.
+        </div>
+        <div className="sm:col-span-2"><Button disabled={loading}>{loading ? 'בודק את הקובץ...' : 'בדיקה ותצוגה מקדימה'}</Button></div>
+      </form>
+
+      {preview && (
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-teal-50 p-4 text-sm text-teal-950">
+            <div className="font-bold">גיליון: {preview.sheetName}</div>
+            <div className="mt-1">נמצאו {preview.rows.length} שורות · {preview.importableCount} מוכנות לייבוא · {preview.duplicateCount} חודשים קיימים · {preview.errorCount} שגיאות</div>
+          </div>
+          {preview.notices.map((notice) => (
+            <div key={notice} className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{notice}</div>
+          ))}
+          <div className="max-h-80 overflow-auto rounded-xl border border-slate-200">
+            <table className="w-full min-w-[900px] text-right text-sm">
+              <thead className="sticky top-0 bg-slate-100 text-slate-600">
+                <tr>
+                  <th className="p-3">שורת Excel</th>
+                  <th className="p-3">חודש</th>
+                  <th className="p-3">שכר דירה</th>
+                  <th className="p-3">חשמל קודם</th>
+                  <th className="p-3">חשמל נוכחי</th>
+                  <th className="p-3">מים קודם</th>
+                  <th className="p-3">מים נוכחי</th>
+                  <th className="p-3">מצב</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.map((row) => (
+                  <tr key={row.sourceRow} className="border-t border-slate-100">
+                    <td className="p-3">{row.sourceRow}</td>
+                    <td className="whitespace-nowrap p-3 font-semibold">{row.year && row.month ? monthLabel(row.year, row.month) : 'לא זוהה'}</td>
+                    <td className="p-3">{row.rentAmount != null ? formatMoney(row.rentAmount) : 'לפי השכירות'}</td>
+                    <td className="p-3">{formatQty(row.electricity?.previous)}</td>
+                    <td className="p-3">{formatQty(row.electricity?.current)}</td>
+                    <td className="p-3">{formatQty(row.water?.previous)}</td>
+                    <td className="p-3">{formatQty(row.water?.current)}</td>
+                    <td className="max-w-72 p-3">
+                      {row.canImport && <span className="font-semibold text-emerald-700">מוכן לייבוא</span>}
+                      {row.duplicate && <span className="font-semibold text-amber-700">חודש קיים — ידולג</span>}
+                      {row.errors.map((message) => <div key={message} className="text-rose-700">{message}</div>)}
+                      {row.warnings.map((message) => <div key={message} className="text-amber-700">{message}</div>)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">השמירה תתבצע רק לאחר אישור. חודשים קיימים לא יידרסו.</p>
+            <Button disabled={loading || preview.importableCount === 0} onClick={confirmImport}>
+              {loading ? 'מייבא...' : `ייבוא ${preview.importableCount} חודשים`}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ApartmentEditForm({ apartment, onDone }) {
   const [form, setForm] = useState({ number: apartment.number, floor: apartment.floor || '', notes: apartment.notes || '' });
   const [error, setError] = useState('');
@@ -398,6 +538,7 @@ export default function ApartmentPage() {
           <p className="text-sm text-slate-500">{apartment.tenantName || 'ללא דייר פעיל'}{apartment.floor ? ` · קומה ${apartment.floor}` : ''}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setModal({ type: 'excelImport' })}>ייבוא Excel</Button>
           <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.xlsx`, `apartment-${apartment.number}.xlsx`)}>ייצוא Excel</Button>
           <Button variant="secondary" onClick={() => downloadFile(`/api/apartments/${id}/history.pdf`, `full-history-${apartment.number}.pdf`)}>PDF כל החודשים והתשלומים</Button>
           <Button onClick={() => setModal({ type: 'month' })}>{months.length === 0 ? 'הזנת קריאות ראשוניות' : 'חודש חדש'}</Button>
@@ -613,6 +754,7 @@ export default function ApartmentPage() {
       )}
 
       {modal?.type === 'month' && <Modal title={months.length === 0 ? 'הזנת קריאות ראשוניות' : 'פתיחת חודש חדש'} onClose={() => setModal(null)}><MonthForm apartmentId={id} onDone={load} /></Modal>}
+      {modal?.type === 'excelImport' && <Modal title="ייבוא נתונים מקובץ Excel" onClose={() => setModal(null)}><ExcelImportForm apartmentId={id} onDone={load} /></Modal>}
       {modal?.type === 'editMonth' && <Modal title={`עריכת ${monthLabel(modal.record.year, modal.record.month)}`} onClose={() => setModal(null)}><EditMonthForm apartmentId={id} record={modal.record} onDone={load} /></Modal>}
       {modal?.type === 'payment' && <Modal title="רישום תשלום" onClose={() => setModal(null)}><PaymentForm apartmentId={id} months={months} onDone={load} /></Modal>}
       {modal?.type === 'apartment' && <Modal title="עריכת פרטי הדירה" onClose={() => setModal(null)}><ApartmentEditForm apartment={apartment} onDone={load} /></Modal>}

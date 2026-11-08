@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { pool } from '../db/pool.js';
 import { asyncRoute, AppError } from '../lib/errors.js';
 import { requireAuth, signAdmin } from '../middleware/auth.js';
@@ -8,6 +9,7 @@ import {
   apartmentSchema,
   apartmentUpdateSchema,
   buildingSchema,
+  excelImportSchema,
   leaseSchema,
   loginSchema,
   monthSchema,
@@ -27,7 +29,13 @@ import {
   updateActiveLease,
   updateApartment,
 } from '../services/apartmentService.js';
-import { createMonth, getMonths, readingPreview, updateMonth } from '../services/billingService.js';
+import {
+  createMonth,
+  getMonths,
+  importMonths,
+  readingPreview,
+  updateMonth,
+} from '../services/billingService.js';
 import { getReceipt, listPayments, listReceipts, recordPayment } from '../services/paymentService.js';
 import { apartmentReport, buildingReport, dashboard } from '../services/reportService.js';
 import { addTariff, getSettings, updateBuilding } from '../services/settingsService.js';
@@ -43,8 +51,13 @@ import {
   buildingWorkbook,
   workbookBuffer,
 } from '../services/excelService.js';
+import { previewApartmentExcel } from '../services/excelImportService.js';
 
 const router = Router();
+const excelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -176,6 +189,27 @@ router.get('/apartments/:id/months', asyncRoute(async (req, res) => {
 router.post('/apartments/:id/months', asyncRoute(async (req, res) => {
   const months = await createMonth(req.params.id, parseBody(monthSchema, req.body), req.user.sub);
   res.status(201).json(months);
+}));
+
+router.post(
+  '/apartments/:id/import/preview',
+  excelUpload.single('file'),
+  asyncRoute(async (req, res) => {
+    if (!req.file) throw new AppError(400, 'יש לבחור קובץ Excel');
+    if (!req.file.originalname.toLowerCase().endsWith('.xlsx')) {
+      throw new AppError(400, 'יש להעלות קובץ Excel מסוג XLSX');
+    }
+    const defaultYear = Number(req.body.defaultYear);
+    if (!Number.isInteger(defaultYear) || defaultYear < 2000 || defaultYear > 2100) {
+      throw new AppError(400, 'יש לבחור שנת ברירת מחדל תקינה');
+    }
+    res.json(await previewApartmentExcel(req.params.id, req.file.buffer, defaultYear));
+  }),
+);
+
+router.post('/apartments/:id/import/commit', asyncRoute(async (req, res) => {
+  const { rows } = parseBody(excelImportSchema, req.body);
+  res.status(201).json(await importMonths(req.params.id, rows, req.user.sub));
 }));
 
 router.patch('/apartments/:id/months/:year/:month', asyncRoute(async (req, res) => {

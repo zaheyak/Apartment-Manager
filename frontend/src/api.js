@@ -6,7 +6,7 @@ export function getToken() {
 
 export async function api(path, options = {}) {
   const headers = { ...(options.headers || {}) };
-  if (options.body) headers['Content-Type'] = 'application/json';
+  if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const response = await fetch(`${BASE}${path}`, { ...options, headers });

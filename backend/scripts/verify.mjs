@@ -1,3 +1,5 @@
+import ExcelJS from 'exceljs';
+
 const base = process.env.API_URL || 'http://localhost:4000/api';
 const testYear = 2099;
 
@@ -240,6 +242,58 @@ const partlyPaidApril = afterCumulativePayment.find((month) => month.month === 4
 assert(paidMarch.remaining === '0.00', 'oldest month paid first');
 assert(partlyPaidApril.rent.amountPaid === '65.00', 'remainder continued into next month');
 assert(partlyPaidApril.cumulativeRemaining === '3565.00', 'updated accumulated balance');
+
+const importWorkbook = new ExcelJS.Workbook();
+const importSheet = importWorkbook.addWorksheet('ייבוא');
+importSheet.addRow([
+  'חודש',
+  'דמי שכירות',
+  'קריאת חשמל קודמת',
+  'קריאת חשמל נוכחית',
+  'מחיר חשמל להכפלה',
+  'קריאת מים קודמת',
+  'קריאת מים נוכחית',
+  'מחיר מים להכפלה',
+]);
+importSheet.addRow([
+  `מאי ${testYear}`,
+  3300,
+  1420,
+  1520,
+  0.75,
+  140.74,
+  150.74,
+  8.5,
+]);
+const importBuffer = await importWorkbook.xlsx.writeBuffer();
+const importForm = new FormData();
+importForm.append('file', new Blob([importBuffer]), 'apartment-import.xlsx');
+importForm.append('defaultYear', String(testYear));
+const importPreviewResponse = await fetch(`${base}/apartments/${apartment.id}/import/preview`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}` },
+  body: importForm,
+});
+const importPreview = await importPreviewResponse.json();
+assert(importPreviewResponse.ok, `import preview ${importPreview.error || ''}`);
+assert(importPreview.importableCount === 1, 'one importable Excel row');
+const importResult = await request(`/apartments/${apartment.id}/import/commit`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    rows: importPreview.rows.filter((row) => row.canImport).map((row) => ({
+      year: row.year,
+      month: row.month,
+      rentAmount: row.rentAmount,
+      electricity: row.electricity,
+      water: row.water,
+    })),
+  },
+});
+assert(importResult.imported === 1, 'Excel month imported');
+const importedMay = importResult.months.find((month) => month.month === 5);
+assert(importedMay.electricity.amountDue === '75.00', 'imported electricity calculated');
+assert(importedMay.water.amountDue === '85.00', 'imported water calculated');
 
 const pdf = await fetch(`${base}/receipts/${partial.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
 const bytes = Buffer.from(await pdf.arrayBuffer());
