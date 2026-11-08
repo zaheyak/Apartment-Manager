@@ -44,8 +44,8 @@ function drawPair(doc, y, label, value, emphasis = false) {
 
 function createDocument(options = {}) {
   const doc = new PDFDocument({ size: 'A4', margin: 48, ...options });
-  doc.registerFont('regular', path.join(fontsDir, 'NotoSansHebrew-Regular.ttf'));
-  doc.registerFont('bold', path.join(fontsDir, 'NotoSansHebrew-Bold.ttf'));
+  doc.registerFont('regular', path.join(fontsDir, 'Heebo-Regular.ttf'));
+  doc.registerFont('bold', path.join(fontsDir, 'Heebo-ExtraBold.ttf'));
   return doc;
 }
 
@@ -139,7 +139,10 @@ function drawTotalBox(doc, y, label, value) {
 }
 
 export function renderReceiptPdf(snapshot) {
-  if (!fs.existsSync(path.join(fontsDir, 'NotoSansHebrew-Regular.ttf'))) {
+  if (
+    !fs.existsSync(path.join(fontsDir, 'Heebo-Regular.ttf'))
+    || !fs.existsSync(path.join(fontsDir, 'Heebo-ExtraBold.ttf'))
+  ) {
     throw new Error('Hebrew font is missing');
   }
   const doc = createDocument();
