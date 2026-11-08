@@ -443,5 +443,53 @@ assert(!paymentsAfterDelete.some((payment) => payment.id === paymentToDelete.pay
 const receiptsAfterDelete = await request(`/apartments/${apartment.id}/receipts`, auth);
 assert(!receiptsAfterDelete.some((receipt) => receipt.paymentId === paymentToDelete.paymentId), 'deleted payment receipt removed');
 
+await request(`/apartments/${apartment.id}/months`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    year: testYear,
+    month: 11,
+    rentAmount: 3300,
+    electricity: { current: 1900, tariffPrice: 0.8 },
+    water: { current: 180.74, tariffPrice: 8.5 },
+  },
+});
+await request(`/apartments/${apartment.id}/months`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    year: testYear,
+    month: 12,
+    rentAmount: 3300,
+    electricity: { current: 2000, tariffPrice: 0.8 },
+    water: { current: 190.74, tariffPrice: 8.5 },
+  },
+});
+const novemberPayment = await request(`/apartments/${apartment.id}/payments`, {
+  method: 'POST',
+  ...auth,
+  body: {
+    paymentDate: `${testYear}-11-15`,
+    amount: 100,
+    method: 'cash',
+    category: 'multiple',
+    billingYear: testYear,
+    billingMonth: 11,
+  },
+});
+const deletedMonth = await request(`/apartments/${apartment.id}/months/${testYear}/11`, {
+  method: 'DELETE',
+  ...auth,
+});
+assert(deletedMonth.deletedPayments === 1, 'related month payment deleted');
+assert(!deletedMonth.months.some((month) => month.month === 11), 'month and charges deleted');
+const decemberAfterDelete = deletedMonth.months.find((month) => month.month === 12);
+assert(decemberAfterDelete.electricity.previousReading === '1800.000', 'electricity sequence repaired after month deletion');
+assert(decemberAfterDelete.water.previousReading === '170.740', 'water sequence repaired after month deletion');
+const paymentsAfterMonthDelete = await request(`/apartments/${apartment.id}/payments`, auth);
+assert(!paymentsAfterMonthDelete.some((payment) => payment.id === novemberPayment.paymentId), 'month payment removed');
+const receiptsAfterMonthDelete = await request(`/apartments/${apartment.id}/receipts`, auth);
+assert(!receiptsAfterMonthDelete.some((receipt) => receipt.paymentId === novemberPayment.paymentId), 'month receipt removed');
+
 console.log('Verification passed');
 console.log(`Apartment ${apartment.number}: January total ₪3,807.55, partial ₪2,000, then paid in full.`);

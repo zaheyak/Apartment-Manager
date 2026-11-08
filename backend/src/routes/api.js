@@ -31,6 +31,7 @@ import {
 } from '../services/apartmentService.js';
 import {
   createMonth,
+  deleteMonth,
   getMonths,
   importMonths,
   readingPreview,
@@ -195,6 +196,15 @@ router.get('/apartments/:id/months', asyncRoute(async (req, res) => {
 router.post('/apartments/:id/months', asyncRoute(async (req, res) => {
   const months = await createMonth(req.params.id, parseBody(monthSchema, req.body), req.user.sub);
   res.status(201).json(months);
+}));
+
+router.delete('/apartments/:id/months/:year/:month', asyncRoute(async (req, res) => {
+  const year = Number(req.params.year);
+  const month = Number(req.params.month);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw new AppError(400, 'חודש לא תקין');
+  }
+  res.json(await deleteMonth(req.params.id, year, month, req.user.sub));
 }));
 
 router.post(

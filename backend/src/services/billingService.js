@@ -290,6 +290,100 @@ export async function importMonths(apartmentId, rows, adminId) {
   };
 }
 
+export async function deleteMonth(apartmentId, year, month, adminId) {
+  const client = await pool.connect();
+  let deletedPayments = 0;
+  try {
+    await client.query('BEGIN');
+    const apartment = await client.query('SELECT id FROM apartments WHERE id = $1 FOR UPDATE', [apartmentId]);
+    if (!apartment.rows[0]) throw new AppError(404, 'הדירה לא נמצאה');
+    const { rows: charges } = await client.query(
+      `SELECT * FROM monthly_charges
+       WHERE apartment_id = $1 AND charge_year = $2 AND charge_month = $3
+       FOR UPDATE`,
+      [apartmentId, year, month],
+    );
+    if (!charges.length) throw new AppError(404, 'החודש לא נמצא');
+    const chargeIds = charges.map((charge) => charge.id);
+    const { rows: relatedPayments } = await client.query(
+      `SELECT p.*, r.id AS receipt_id, r.receipt_number
+       FROM payments p
+       LEFT JOIN payment_receipts r ON r.payment_id = p.id
+       WHERE p.apartment_id = $1
+         AND (
+           (p.billing_year = $2 AND p.billing_month = $3)
+           OR EXISTS (
+             SELECT 1 FROM payment_allocations pa
+             WHERE pa.payment_id = p.id
+               AND pa.monthly_charge_id = ANY($4::uuid[])
+           )
+         )
+       FOR UPDATE OF p`,
+      [apartmentId, year, month, chargeIds],
+    );
+    const paymentIds = relatedPayments.map((payment) => payment.id);
+    if (paymentIds.length) {
+      await client.query(
+        `DELETE FROM documents
+         WHERE receipt_id IN (
+           SELECT id FROM payment_receipts WHERE payment_id = ANY($1::uuid[])
+         )`,
+        [paymentIds],
+      );
+      await client.query('DELETE FROM payment_receipts WHERE payment_id = ANY($1::uuid[])', [paymentIds]);
+      await client.query('DELETE FROM payment_allocations WHERE payment_id = ANY($1::uuid[])', [paymentIds]);
+      await client.query('DELETE FROM payments WHERE id = ANY($1::uuid[])', [paymentIds]);
+      deletedPayments = paymentIds.length;
+    }
+
+    for (const charge of charges.filter((item) => item.category !== 'rent')) {
+      await rebaseNextUtilityCharge(
+        client,
+        apartmentId,
+        charge.category,
+        year,
+        month,
+        Number(charge.previous_reading),
+      );
+    }
+    const meterReadingIds = charges
+      .map((charge) => charge.meter_reading_id)
+      .filter(Boolean);
+    await client.query('DELETE FROM monthly_charges WHERE id = ANY($1::uuid[])', [chargeIds]);
+    if (meterReadingIds.length) {
+      await client.query('DELETE FROM meter_readings WHERE id = ANY($1::uuid[])', [meterReadingIds]);
+    }
+    await audit(client, adminId, apartmentId, 'delete_month', {
+      year,
+      month,
+      charges: charges.map((charge) => ({
+        category: charge.category,
+        amountDue: Number(charge.amount_due),
+        previous: charge.previous_reading == null ? null : Number(charge.previous_reading),
+        current: charge.current_reading == null ? null : Number(charge.current_reading),
+      })),
+      deletedPayments: relatedPayments.map((payment) => ({
+        id: payment.id,
+        amount: Number(payment.amount),
+        paymentDate: payment.payment_date,
+        method: payment.method,
+        receiptNumber: payment.receipt_number,
+      })),
+    }, null);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return {
+    ok: true,
+    deletedPayments,
+    months: await getMonths(apartmentId),
+  };
+}
+
 async function allocatedCents(client, chargeId) {
   const { rows } = await client.query(
     `SELECT COALESCE(SUM(amount), 0) AS paid FROM payment_allocations WHERE monthly_charge_id = $1`,

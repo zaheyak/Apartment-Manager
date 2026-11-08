@@ -587,6 +587,20 @@ export default function ApartmentPage() {
     }
   }
 
+  async function removeMonth(month) {
+    const approved = window.confirm(
+      `למחוק את ${monthLabel(month.year, month.month)} וכל הנתונים שלו?\n\nיימחקו החיובים, קריאות המונים, התשלומים ואישורי התשלום הקשורים לחודש. לא ניתן לבטל פעולה זו.`,
+    );
+    if (!approved) return;
+    setError('');
+    try {
+      await api(`/api/apartments/${id}/months/${month.year}/${month.month}`, { method: 'DELETE' });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div className="apartment-page -m-4 min-h-[calc(100vh-57px)] space-y-6 p-4 sm:-m-6 sm:p-6 lg:-m-8 lg:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -667,6 +681,7 @@ export default function ApartmentPage() {
                 >
                   הורדת PDF לחודש
                 </Button>
+                <Button variant="danger" onClick={() => removeMonth(detailMonth)}>מחיקת החודש</Button>
               </div>
               <div className="mb-4 grid gap-3 lg:grid-cols-3">
                 <ChargeBlock title="שכר דירה" charge={detailMonth.rent} />
@@ -726,6 +741,7 @@ export default function ApartmentPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Button variant="secondary" onClick={() => setModal({ type: 'editMonth', record: month })}>עריכת החודש</Button>
                         <Button onClick={() => downloadFile(`/api/apartments/${id}/months/${month.year}/${month.month}/summary.pdf`, `monthly-charge-${month.year}-${month.month}.pdf`)}>הורדת PDF לחודש</Button>
+                        <Button variant="danger" onClick={() => removeMonth(month)}>מחיקת החודש</Button>
                       </div>
                     </div>
                     <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
